@@ -64,7 +64,11 @@ class CustomBundleAnalyzer(private val context: Context) {
 
     fun analyze(uri: Uri): Result<Analysis> = runCatching {
         val originalName = queryDisplayName(uri)
+        // Some picker roots (Recent, Downloads `msf:` ids) refuse the
+        // DISPLAY_NAME query, so fall back to the file's leading bytes.
         val archive = detectArchive(originalName)
+            .takeIf { it != ArchiveKind.UNKNOWN }
+            ?: openStream(uri).use { sniffArchive(readBoundedBytes(it, SNIFF_BYTES)) }
         // `inlineFiles` captures the bytes of every small (<64 KB) text /
         // JSON / list file inside the archive as we stream past it, so we
         // can read speaker manifests without a second pass over the input
@@ -379,7 +383,24 @@ class CustomBundleAnalyzer(private val context: Context) {
         } ?: 0L
     }.getOrDefault(0L)
 
-    private companion object {
+    internal companion object {
+        /** Enough to reach the POSIX tar magic at offset 257. */
+        const val SNIFF_BYTES = 512
+
+        /** Archive kind from a file's first [SNIFF_BYTES] bytes. */
+        fun sniffArchive(head: ByteArray): ArchiveKind {
+            fun at(offset: Int, magic: String) = head.size >= offset + magic.length &&
+                magic.indices.all { head[offset + it] == magic[it].code.toByte() }
+            return when {
+                at(0, "BZh") -> ArchiveKind.TAR_BZ2
+                at(0, "PK\u0003\u0004") -> ArchiveKind.ZIP
+                at(257, "ustar") -> ArchiveKind.TAR
+                // ONNX is a protobuf ModelProto; field 1 (ir_version, varint) encodes as 0x08.
+                head.isNotEmpty() && head[0] == 0x08.toByte() -> ArchiveKind.BARE_ONNX
+                else -> ArchiveKind.UNKNOWN
+            }
+        }
+
         const val TOKENS_FILE = "tokens.txt"
         const val LEXICON_FILE = "lexicon.txt"
 
