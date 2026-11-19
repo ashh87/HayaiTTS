@@ -20,6 +20,7 @@ import dev.ahmedmohamed.hayaitts.data.voices.VoiceRepositoryImpl
 import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.ModelFamily
 import dev.ahmedmohamed.hayaitts.domain.repo.SettingsRepository
+import dev.ahmedmohamed.hayaitts.tts.g2p.MisakiAssets
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
@@ -404,12 +405,11 @@ class SherpaTtsRuntime private constructor(
                 "", "en" -> {
                     // espeak-ng's British voice is plain "en"; "en-gb" is not a voice name.
                     val espeakVoice = if (british) "en" else "en-us"
-                    val lexicon = File(dir, if (british) "lexicon-gb-en.txt" else "lexicon-us-en.txt")
-                    if (lexicon.isFile) {
-                        LexiconFirstFrontend(LexiconFirstFrontend.load(lexicon)) { Espeak.phonemize(context, it, espeakVoice) }
-                    } else {
-                        espeak(espeakVoice)
-                    }
+                    MisakiFrontend(
+                        MisakiAssets.english(context, british, File(dir, CUSTOM_WORDS_FILE)) {
+                            Espeak.phonemize(context, it, espeakVoice).joinToString(" ")
+                        },
+                    )
                 }
                 else -> espeak(KOKORO_ESPEAK_VOICES[kokoroLanguage] ?: kokoroLanguage)
             }
@@ -769,6 +769,8 @@ class SherpaTtsRuntime private constructor(
         private const val KOKORO_VOICES_FILE = "voices.bin"
         private const val KOKORO_LEXICON_PREFIX = "lexicon-"
         private const val DEFAULT_KOKORO_LANGUAGE = "en"
+        /** Optional per-bundle custom words, misaki phonemes: `word<whitespace>phonemes`, `#` comments. */
+        private const val CUSTOM_WORDS_FILE = "pronunciations.tsv"
         private val KOKORO_ESPEAK_VOICES = mapOf("pt" to "pt-br")
         private val ZIPVOICE_ENCODER_CANDIDATES = listOf("encoder.int8.onnx", "encoder.onnx")
         private val ZIPVOICE_DECODER_CANDIDATES = listOf("decoder.int8.onnx", "decoder.onnx")

@@ -1,0 +1,6 @@
+On-device English G2P data (see app/src/main/java/.../tts/g2p and tools/g2p):
+
+- gb_/us_ gold and silver dictionaries: from misaki by hexgrad (https://github.com/hexgrad/misaki), Apache-2.0.
+- en_tokenizer.json: tokenizer rules and exceptions from spaCy (https://github.com/explosion/spaCy), MIT.
+- pos_tagger.txt: averaged perceptron trained to reproduce spaCy en_core_web_sm tags on the text of
+  UD_English-EWT (CC BY-SA 4.0) and UD_English-GUM (CC BY 4.0 / per-document licences).

@@ -3,7 +3,7 @@ package dev.ahmedmohamed.hayaitts.tts
 import android.content.Context
 import com.github.csukuangfj.piper.phonemize.piperPhonemizeInitialize
 import com.github.csukuangfj.piper.phonemize.piperPhonemizeText
-import java.io.File
+import dev.ahmedmohamed.hayaitts.tts.g2p.MisakiEnglish
 
 /**
  * sherpa-onnx 2.x no longer bundles espeak-ng, so voices that relied on it
@@ -35,62 +35,36 @@ object Espeak {
 }
 
 /**
- * Kokoro English: lexicon first (Kokoro was trained on misaki's dictionary
- * phonemes, and custom words live there), espeak for the gaps — the same
- * strategy misaki itself uses. Runs of out-of-lexicon words go to espeak
- * together so numbers and context-dependent words keep their context.
+ * Kokoro English: misaki (Kokoro's own G2P), ported in [MisakiEnglish]. Like
+ * KPipeline it phonemizes each paragraph whole, then cuts the phonemes into
+ * chunks at sentence ends — sherpa hard-splits anything over 400 tokens.
  */
-class LexiconFirstFrontend(
-    private val lexicon: Map<String, String>,
-    private val espeak: (String) -> List<String>,
-) : PhonemeFrontend {
-
+class MisakiFrontend(private val g2p: MisakiEnglish) : PhonemeFrontend {
     override fun phonemize(text: String): Array<IntArray> =
-        SENTENCE_END.split(text)
-            .map { sentence -> phonemizeSentence(sentence).codePoints().toArray() }
-            .filter { it.isNotEmpty() }
+        text.split(PARAGRAPHS)
+            .flatMap { chunks(g2p.phonemize(it)) }
+            .filter { it.isNotBlank() }
+            .map { it.codePoints().toArray() }
             .toTypedArray()
 
-    internal fun phonemizeSentence(sentence: String): String {
-        val out = StringBuilder()
-        var last = 0
-        for (m in WORD.findAll(sentence)) {
-            val phonemes = lexicon[m.value.lowercase().replace('’', '\'')] ?: continue
-            appendGap(out, sentence.substring(last, m.range.first))
-            out.append(phonemes)
-            last = m.range.last + 1
-        }
-        appendGap(out, sentence.substring(last))
-        return out.toString().replace(SPACES, " ").trim()
-    }
-
-    // A gap is everything between two lexicon words: spaces, punctuation and
-    // any out-of-lexicon words.
-    private fun appendGap(out: StringBuilder, gap: String) {
-        val start = gap.indexOfFirst { it.isLetterOrDigit() }
-        if (start < 0) {
-            gap.forEach { c -> out.append(if (c.isWhitespace()) ' ' else c) }
-            return
-        }
-        val end = gap.indexOfLast { it.isLetterOrDigit() } + 1
-        appendGap(out, gap.substring(0, start))
-        out.append(espeak(gap.substring(start, end)).joinToString(" "))
-        appendGap(out, gap.substring(end))
-    }
-
     companion object {
-        private val SENTENCE_END = Regex("(?<=[.!?…])\\s+")
-        private val WORD = Regex("[\\p{L}\\p{N}][\\p{L}\\p{N}'’]*")
-        private val SPACES = Regex("\\s+")
+        private const val MAX_CHUNK = 400
+        private val PARAGRAPHS = Regex("\n+")
+        private val SENTENCE_END = Regex("(?<=[.!?…]) +")
 
-        /** sherpa-onnx lexicon format: `word p h o n e s`, one token per field. */
-        fun load(file: File): Map<String, String> {
-            val map = HashMap<String, String>(250_000)
-            file.forEachLine { line ->
-                val fields = line.trim().split(' ')
-                if (fields.size > 1) map.putIfAbsent(fields[0].lowercase(), fields.drop(1).joinToString(""))
+        // KPipeline.waterfall_last, simplified: prefer the strongest punctuation before the limit.
+        internal fun chunks(ps: String): List<String> = ps.split(SENTENCE_END).flatMap { sentence ->
+            val out = mutableListOf<String>()
+            var rest = sentence.trim()
+            while (rest.length > MAX_CHUNK) {
+                val head = rest.substring(0, MAX_CHUNK)
+                val cut = listOf("!.?…", ":;", ",—", " ").firstNotNullOfOrNull { marks ->
+                    head.indexOfLast { it in marks }.takeIf { it > 0 }
+                } ?: (MAX_CHUNK - 1)
+                out += rest.substring(0, cut + 1).trim()
+                rest = rest.substring(cut + 1).trim()
             }
-            return map
+            out + rest
         }
     }
 }
