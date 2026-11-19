@@ -70,12 +70,6 @@ class CustomImportViewModel(
             val result = withContext(dispatchers.io) { analyzer.analyze(uri) }
             result
                 .onSuccess { analysis ->
-                    analysis.unsupportedFamily?.let { unsupported ->
-                        _state.value = Phase.Failed(
-                            "${unsupported.name.lowercase().replaceFirstChar { it.uppercase() }} bundles are not yet supported by this app build.",
-                        )
-                        return@onSuccess
-                    }
                     _state.value = Phase.Confirm(
                         analysis = analysis,
                         voiceName = analysis.suggestedName,
