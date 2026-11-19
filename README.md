@@ -200,7 +200,7 @@ Built on **Kotlin + Jetpack Compose (M3 Expressive)**, **Koin** for DI,
 **Room** for installed-voice state, **WorkManager** for downloads,
 **OkHttp** for catalog refresh, and the upstream
 [**sherpa-onnx**](https://github.com/k2-fsa/sherpa-onnx) AAR
-(vendored at `app/libs/sherpa-onnx-1.13.2.aar`) for the JNI runtime.
+(vendored at `app/libs/sherpa-onnx-2.0.2.aar`) for the JNI runtime.
 
 ```
 ui/  ───────► UseCase ──────► Repository ──────► Data source ──────► sherpa-onnx JNI

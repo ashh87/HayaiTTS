@@ -3,6 +3,7 @@ package dev.ahmedmohamed.hayaitts.tts
 import android.annotation.SuppressLint
 import android.content.Context
 import co.touchlab.kermit.Logger
+import com.k2fsa.sherpa.onnx.GeneratedAudio
 import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
@@ -49,12 +50,22 @@ class SherpaTtsRuntime private constructor(
         val maxNumSentences: Int
     )
 
-    private val loaded = LinkedHashMap<EngineKey, OfflineTts>(MAX_LOADED_VOICES, 0.75f, true)
+    /** [frontend] is null when sherpa-onnx reads the text itself (lexicon / character models). */
+    private class Engine(val tts: OfflineTts, val frontend: PhonemeFrontend?) {
+        fun generate(text: String, sid: Int, speed: Float, onChunk: ((FloatArray) -> Int)? = null): GeneratedAudio {
+            val phonemes = frontend?.phonemize(text)?.takeIf { it.isNotEmpty() }
+                ?: return if (onChunk == null) tts.generate(text, sid, speed) else tts.generateWithCallback(text, sid, speed, onChunk)
+            val cfg = GenerationConfig(sid = sid, speed = speed, phonemeCodepoints = phonemes)
+            return if (onChunk == null) tts.generateWithConfig("", cfg) else tts.generateWithConfigAndCallback("", cfg, onChunk)
+        }
+    }
+
+    private val loaded = LinkedHashMap<EngineKey, Engine>(MAX_LOADED_VOICES, 0.75f, true)
 
     data class SynthesisOutput(val sampleRate: Int, val samples: FloatArray)
 
     fun sampleRateOf(voiceId: String, languageHint: String? = null): Int =
-        engine(voiceId, 1f, languageHint = languageHint).sampleRate()
+        engine(voiceId, 1f, languageHint = languageHint).tts.sampleRate()
 
     fun synthesize(
         voiceId: String,
@@ -67,7 +78,7 @@ class SherpaTtsRuntime private constructor(
         noiseScaleW: Float = 0.8f,
         languageHint: String? = null,
     ): SynthesisOutput {
-        val tts = engine(voiceId, lengthScale, noiseScale, noiseScaleW, text, languageHint)
+        val engine = engine(voiceId, lengthScale, noiseScale, noiseScaleW, text, languageHint)
         // Clamp the speaker id to the model's actual range before
         // crossing the JNI boundary. Kokoro 1.1 ships ~50–100 named
         // speakers, but the catalog occasionally over-counts (placeholder
@@ -75,7 +86,7 @@ class SherpaTtsRuntime private constructor(
         // synthesised every sid). An OOB sid inside sherpa-onnx is a
         // SIGSEGV rather than a Java exception, so we have to guard
         // here — there is no catch upstream that would survive it.
-        val nSpeakers = runCatching { tts.numSpeakers() }.getOrDefault(0)
+        val nSpeakers = runCatching { engine.tts.numSpeakers() }.getOrDefault(0)
         val safeSid = if (nSpeakers > 0) sid.coerceIn(0, nSpeakers - 1) else 0
         if (safeSid != sid) {
             log.w { "Clamping sid for $voiceId: requested=$sid, available=$nSpeakers" }
@@ -88,7 +99,7 @@ class SherpaTtsRuntime private constructor(
         // true native SIGSEGV inside the .so is still unrecoverable, but
         // anything raised as a Java throwable will land here.
         val audio = try {
-            tts.generate(text = text, sid = safeSid, speed = speed)
+            engine.generate(text, safeSid, speed)
         } catch (t: Throwable) {
             log.e(t) { "tts.generate failed for $voiceId sid=$safeSid (${text.length} chars)" }
             throw SynthesisFailure(
@@ -135,15 +146,11 @@ class SherpaTtsRuntime private constructor(
         languageHint: String? = null,
         onChunk: (FloatArray) -> Int,
     ): SynthesisOutput {
-        val tts = engine(voiceId, lengthScale, noiseScale, noiseScaleW, text, languageHint)
-        val nSpeakers = runCatching { tts.numSpeakers() }.getOrDefault(0)
+        val engine = engine(voiceId, lengthScale, noiseScale, noiseScaleW, text, languageHint)
+        val nSpeakers = runCatching { engine.tts.numSpeakers() }.getOrDefault(0)
         val safeSid = if (nSpeakers > 0) sid.coerceIn(0, nSpeakers - 1) else 0
         val audio = try {
-            tts.generateWithCallback(
-                text = text,
-                sid = safeSid,
-                speed = speed,
-            ) { chunk ->
+            engine.generate(text, safeSid, speed) { chunk ->
                 val shifted = if (kotlin.math.abs(pitch - 1f) < 0.001f) chunk
                     else PitchResampler.resample(chunk, pitch)
                 onChunk(shifted)
@@ -186,7 +193,7 @@ class SherpaTtsRuntime private constructor(
         require(installed.family.supportsCloning) {
             "Family ${installed.family} does not support voice cloning"
         }
-        val tts = engine(voiceId, lengthScale = 1f, noiseScale = 0.667f, noiseScaleW = 0.8f)
+        val tts = engine(voiceId, lengthScale = 1f, noiseScale = 0.667f, noiseScaleW = 0.8f).tts
         val cfg = GenerationConfig(
             silenceScale = 1f,
             speed = speed,
@@ -290,7 +297,7 @@ class SherpaTtsRuntime private constructor(
         noiseScaleW: Float = 0.8f,
         text: String? = null,
         languageHint: String? = null,
-    ): OfflineTts = synchronized(this) {
+    ): Engine = synchronized(this) {
         val settings = runCatching { GlobalContext.get().get<SettingsRepository>() }.getOrNull()
         val useNnapi = runCatching { runBlocking { settings?.useNnapi?.first() } }.getOrNull() ?: false
         val numThreads = runCatching { runBlocking { settings?.synthesisThreads?.first() } }.getOrNull() ?: 2
@@ -311,7 +318,7 @@ class SherpaTtsRuntime private constructor(
 
         val key = EngineKey(voiceId, kokoroLanguage, lengthB, noiseB, noiseWB, useNnapi, numThreads, maxNumSentences)
         loaded[key]?.let { return@synchronized it }
-        val tts = buildEngine(
+        val engine = buildEngine(
             voice = voice,
             family = family,
             kokoroLanguage = kokoroLanguage,
@@ -322,9 +329,9 @@ class SherpaTtsRuntime private constructor(
             numThreads = numThreads,
             maxNumSentences = maxNumSentences,
         )
-        loaded[key] = tts
+        loaded[key] = engine
         evictIfNeeded(voiceId)
-        tts
+        engine
     }
 
     private fun evictIfNeeded(currentVoiceId: String) {
@@ -333,14 +340,14 @@ class SherpaTtsRuntime private constructor(
             val drop = perVoiceKeys.size - MAX_LENGTH_BUCKETS_PER_VOICE
             perVoiceKeys.take(drop).forEach { key ->
                 val evicted = loaded.remove(key)
-                evicted?.runCatching { release() }
+                evicted?.tts?.runCatching { release() }
                 log.i { "Evicted config key $key for $currentVoiceId" }
             }
         }
         while (loaded.size > MAX_LOADED_VOICES) {
             val oldestKey = loaded.keys.iterator().next()
             val evicted = loaded.remove(oldestKey)
-            evicted?.runCatching { release() }
+            evicted?.tts?.runCatching { release() }
             log.i { "Evicted oldest key $oldestKey from runtime cache" }
         }
     }
@@ -361,7 +368,7 @@ class SherpaTtsRuntime private constructor(
         useNnapi: Boolean,
         numThreads: Int,
         maxNumSentences: Int
-    ): OfflineTts {
+    ): Engine {
         val path = voice.installedPath.takeIf { it.isNotBlank() }
             ?: error("Voice ${voice.voiceId} has no installedPath; reinstall the bundle.")
         val voiceDir = File(path).also { dir ->
@@ -372,7 +379,43 @@ class SherpaTtsRuntime private constructor(
         val config = buildConfig(family, voiceDir, kokoroLanguage, lengthScale, noiseScale, noiseScaleW, useNnapi, numThreads, maxNumSentences)
         val tts = OfflineTts(assetManager = null, config = config)
         log.i { "OfflineTts ready for ${voice.voiceId} (sampleRate=${tts.sampleRate()})" }
-        return tts
+        return Engine(tts, frontendFor(family, voiceDir, voice, kokoroLanguage, tts))
+    }
+
+    /** Matches what sherpa-onnx 1.x did internally: espeak wherever the bundle shipped espeak-ng-data. */
+    private fun frontendFor(
+        family: ModelFamily,
+        dir: File,
+        voice: InstalledVoice,
+        kokoroLanguage: String,
+        tts: OfflineTts,
+    ): PhonemeFrontend? {
+        if (!File(dir, ESPEAK_DIR).isDirectory) return null
+        fun espeak(espeakVoice: String) = PhonemeFrontend { text ->
+            Espeak.phonemize(context, text, espeakVoice).map { it.codePoints().toArray() }.toTypedArray()
+        }
+        val english = voice.languages.firstOrNull { it.languageHead() == "en" }
+        val british = english?.replace('_', '-')?.equals("en-GB", ignoreCase = true) == true
+        return when (family) {
+            ModelFamily.PIPER, ModelFamily.VITS, ModelFamily.MATCHA, ModelFamily.KITTEN ->
+                espeak(tts.lang().ifBlank { if (british) "en" else "en-us" })
+            ModelFamily.KOKORO -> when (kokoroLanguage) {
+                "zh" -> null
+                "", "en" -> {
+                    // espeak-ng's British voice is plain "en"; "en-gb" is not a voice name.
+                    val espeakVoice = if (british) "en" else "en-us"
+                    val lexicon = File(dir, if (british) "lexicon-gb-en.txt" else "lexicon-us-en.txt")
+                    if (lexicon.isFile) {
+                        LexiconFirstFrontend(LexiconFirstFrontend.load(lexicon)) { Espeak.phonemize(context, it, espeakVoice) }
+                    } else {
+                        espeak(espeakVoice)
+                    }
+                }
+                else -> espeak(KOKORO_ESPEAK_VOICES[kokoroLanguage] ?: kokoroLanguage)
+            }
+            // ZipVoice reads its own lexicon in 2.x; Pocket and Supertonic tokenize text themselves.
+            else -> null
+        }
     }
 
     private fun buildConfig(
@@ -726,6 +769,7 @@ class SherpaTtsRuntime private constructor(
         private const val KOKORO_VOICES_FILE = "voices.bin"
         private const val KOKORO_LEXICON_PREFIX = "lexicon-"
         private const val DEFAULT_KOKORO_LANGUAGE = "en"
+        private val KOKORO_ESPEAK_VOICES = mapOf("pt" to "pt-br")
         private val ZIPVOICE_ENCODER_CANDIDATES = listOf("encoder.int8.onnx", "encoder.onnx")
         private val ZIPVOICE_DECODER_CANDIDATES = listOf("decoder.int8.onnx", "decoder.onnx")
         private val ZIPVOICE_VOCODER_CANDIDATES = listOf("vocos_24khz.onnx", "vocos_22khz.onnx", "vocoder.onnx")

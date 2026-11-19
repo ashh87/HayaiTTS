@@ -10,6 +10,8 @@
 # data class, plus the `external fun` JNI entry points.
 -keep class com.k2fsa.sherpa.onnx.** { *; }
 -keepclassmembers class com.k2fsa.sherpa.onnx.** { *; }
+# piper-phonemize (espeak-ng) JNI: native methods are bound by name.
+-keep class com.github.csukuangfj.piper.phonemize.** { *; }
 # Also keep any *Config nested data class shape — the native side reads
 # `OfflineTtsKokoroModelConfig.voices`, `OfflineTtsConfig.silenceScale`, etc
 # by name even when the AAR ships them.

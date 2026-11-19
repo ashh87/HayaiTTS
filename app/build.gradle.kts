@@ -212,7 +212,10 @@ dependencies {
     // The AAR contains classes.jar (Kotlin glue for every TTS family) plus
     // jni/<abi>/{libonnxruntime,libsherpa-onnx-c-api,libsherpa-onnx-cxx-api,libsherpa-onnx-jni}.so
     // for arm64-v8a, armeabi-v7a, x86, and x86_64.
-    implementation(files("libs/sherpa-onnx-1.13.2.aar"))
+    // v2.x dropped espeak-ng (now GPL-free), so espeak voices are phonemized
+    // in-app with piper-phonemize (GPL-3, same author; ships espeak-ng-data as assets).
+    implementation(files("libs/sherpa-onnx-2.0.2.aar"))
+    implementation(files("libs/piper-phonemize-1.5.9.aar"))
 
     testImplementation(libs.junit4)
     testImplementation(libs.coroutines.test)
