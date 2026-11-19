@@ -46,8 +46,6 @@ class CustomBundleAnalyzer(private val context: Context) {
         val detectedFamily: ModelFamily?,
         /** Why detection landed where it did (surfaced in the UI as a help line). */
         val familyReason: String,
-        /** Whether we recognised this as a Kokoro/Kitten bundle we refuse. */
-        val unsupportedFamily: ModelFamily?,
         /** Flat file listing — name + uncompressed size in bytes. */
         val entries: List<Entry>,
         /** Best-effort BCP-47 tags (may be empty if we cannot guess). */
@@ -82,7 +80,7 @@ class CustomBundleAnalyzer(private val context: Context) {
         }
         if (entries.isEmpty()) error("Bundle is empty")
 
-        val (family, reason, unsupported) = classifyFamily(entries, archive)
+        val (family, reason) = classifyFamily(entries, archive)
         val langs = guessLanguages(originalName, entries)
         val speakers = guessSpeakersFrom(inlineFiles)
         val suggested = sanitizeName(originalName ?: "custom-voice")
@@ -91,7 +89,6 @@ class CustomBundleAnalyzer(private val context: Context) {
             archive = archive,
             detectedFamily = family,
             familyReason = reason,
-            unsupportedFamily = unsupported,
             entries = entries.sortedBy { it.path },
             detectedLanguages = langs,
             speakers = speakers,
@@ -192,7 +189,6 @@ class CustomBundleAnalyzer(private val context: Context) {
     private data class FamilyDetection(
         val family: ModelFamily?,
         val reason: String,
-        val unsupported: ModelFamily?,
     )
 
     private fun classifyFamily(entries: List<Entry>, archive: ArchiveKind): FamilyDetection {
@@ -207,11 +203,13 @@ class CustomBundleAnalyzer(private val context: Context) {
         val hasModelOnnx = basenames.contains("model.onnx")
 
         if (hasVoicesBin) {
-            return FamilyDetection(
-                family = null,
-                reason = "Bundle looks like a Kokoro voice (voices.bin present).",
-                unsupported = ModelFamily.KOKORO,
-            )
+            // Kokoro and Kitten bundles share this layout; upstream Kitten bundles carry "kitten" in their paths.
+            val kitten = entries.any { it.path.contains("kitten", ignoreCase = true) }
+            return if (kitten) {
+                FamilyDetection(ModelFamily.KITTEN, "Kitten: voices.bin + kitten model.")
+            } else {
+                FamilyDetection(ModelFamily.KOKORO, "Kokoro: model.onnx + voices.bin.")
+            }
         }
 
         val matchaAcoustic = basenames.any {
@@ -222,29 +220,27 @@ class CustomBundleAnalyzer(private val context: Context) {
             n.contains("vocos") || n.contains("hifigan") || n.contains("vocoder")
         }
         if (matchaAcoustic && (matchaVocoder || onnxFiles.size >= 2)) {
-            return FamilyDetection(ModelFamily.MATCHA, "Matcha: acoustic + vocoder onnx present.", null)
+            return FamilyDetection(ModelFamily.MATCHA, "Matcha: acoustic + vocoder onnx present.")
         }
 
         if (hasModelOnnx && hasTokens && hasLexicon && hasDict) {
-            return FamilyDetection(ModelFamily.VITS, "VITS: model.onnx + lexicon.txt + dict/.", null)
+            return FamilyDetection(ModelFamily.VITS, "VITS: model.onnx + lexicon.txt + dict/.")
         }
         if (hasModelOnnx && hasTokens && (hasEspeak || !hasLexicon)) {
-            return FamilyDetection(ModelFamily.PIPER, "Piper: model.onnx + tokens.txt.", null)
+            return FamilyDetection(ModelFamily.PIPER, "Piper: model.onnx + tokens.txt.")
         }
         if (hasModelOnnx && hasTokens) {
-            return FamilyDetection(ModelFamily.VITS, "VITS: model.onnx + tokens.txt.", null)
+            return FamilyDetection(ModelFamily.VITS, "VITS: model.onnx + tokens.txt.")
         }
         if (archive == ArchiveKind.BARE_ONNX) {
             return FamilyDetection(
                 family = ModelFamily.PIPER,
                 reason = "Bare .onnx assumed to be Piper — you must provide a matching tokens.txt later.",
-                unsupported = null,
             )
         }
         return FamilyDetection(
             family = null,
             reason = "Could not infer family from contents — choose one below.",
-            unsupported = null,
         )
     }
 
