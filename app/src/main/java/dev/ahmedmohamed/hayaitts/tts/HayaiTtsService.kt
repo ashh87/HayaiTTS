@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
 import java.util.Locale
+import kotlin.concurrent.thread
 
 /**
  * System-wide TTS engine. Iterates every voice the user has installed
@@ -49,7 +50,8 @@ class HayaiTtsService : TextToSpeechService() {
     override fun onLoadLanguage(lang: String?, country: String?, variant: String?): Int {
         val result = onIsLanguageAvailable(lang, country, variant)
         if (result >= TextToSpeech.LANG_AVAILABLE) {
-            runtimeOrNull()?.let { rt -> rt.preloadFrontends(rt.listAvailableVoices().filter { it.matchesLanguage(lang) }) }
+            resolveVoiceName(onGetDefaultVoiceNameFor(lang, country, variant))
+                ?.let { warm(it, buildBcp47(lang, country, variant).ifBlank { null }) }
         }
         return result
     }
@@ -107,9 +109,29 @@ class HayaiTtsService : TextToSpeechService() {
     override fun onLoadVoice(name: String?): Int {
         val voice = resolveVoiceName(name) ?: return TextToSpeech.ERROR
         lastSelectedVoiceId = name!!
-        runtimeOrNull()?.preloadFrontends(listOf(voice))
+        warm(voice, voice.languages.firstOrNull())
         return TextToSpeech.SUCCESS
     }
+
+    /**
+     * Loads the voice's model (and misaki's tables) in the background with the settings
+     * onSynthesizeText will use, so the first speak() finds it in memory. A speak() that
+     * arrives mid-load waits on the same load rather than starting another.
+     */
+    private fun warm(voice: InstalledVoice, languageHint: String?) {
+        val rt = runtimeOrNull() ?: return
+        rt.preloadFrontends(listOf(voice))
+        thread(name = "engine-preload", isDaemon = true) {
+            val t = tuningFor(voice.voiceId)
+            runCatching { rt.sampleRateOf(voice.voiceId, languageHint, t.lengthScale, t.noiseScale, t.noiseScaleW) }
+                .onFailure { log.w(it) { "Preloading ${voice.voiceId} failed" } }
+        }
+    }
+
+    private fun tuningFor(voiceId: String): VoiceTuning =
+        runCatching { GlobalContext.get().get<VoiceTuningRepository>() }.getOrNull()?.let { repo ->
+            runCatching { runBlocking { repo.tuningFor(voiceId).first() } }.getOrNull()
+        } ?: VoiceTuning.Default
 
     /**
      * Parse a framework voice name and validate it against the installed
@@ -186,10 +208,7 @@ class HayaiTtsService : TextToSpeechService() {
             return
         }
 
-        val tuningRepo = runCatching { GlobalContext.get().get<VoiceTuningRepository>() }.getOrNull()
-        val tuning = tuningRepo?.let { repo ->
-            runCatching { runBlocking { repo.tuningFor(voice.voiceId).first() } }.getOrNull()
-        } ?: VoiceTuning.Default
+        val tuning = tuningFor(voice.voiceId)
 
         val requestSpeed = (request.speechRate.toFloat() / 100f).coerceIn(0.5f, 2.0f)
         val speed = (requestSpeed * tuning.speed).coerceIn(0.5f, 2.0f)
@@ -206,7 +225,8 @@ class HayaiTtsService : TextToSpeechService() {
             ?: 0
 
         val sampleRate = try {
-            runtime.sampleRateOf(voice.voiceId, languageHint = requestLanguageHint)
+            // Same settings as the synthesis below, so this loads (or reuses) that one engine.
+            runtime.sampleRateOf(voice.voiceId, requestLanguageHint, tuning.lengthScale, tuning.noiseScale, tuning.noiseScaleW)
         } catch (t: Throwable) {
             log.e(t) { "Could not load voice ${voice.voiceId}" }
             callback.error()
@@ -219,8 +239,9 @@ class HayaiTtsService : TextToSpeechService() {
             return
         }
 
-        val output = try {
-            runtime.synthesize(
+        // Each sentence is played as soon as it is generated; returning 0 stops sherpa early.
+        try {
+            runtime.synthesizeStreaming(
                 voiceId = voice.voiceId,
                 text = text,
                 sid = sid,
@@ -230,19 +251,12 @@ class HayaiTtsService : TextToSpeechService() {
                 noiseScale = tuning.noiseScale,
                 noiseScaleW = tuning.noiseScaleW,
                 languageHint = requestLanguageHint,
-            )
+            ) { chunk -> if (streamPcm(callback, chunk)) 1 else 0 }
         } catch (t: Throwable) {
             log.e(t) { "sherpa-onnx synthesis failed" }
             callback.error()
             return
         }
-
-        if (stopRequested) {
-            callback.done()
-            return
-        }
-
-        streamPcm(callback, output.samples)
         callback.done()
     }
 
@@ -284,9 +298,9 @@ class HayaiTtsService : TextToSpeechService() {
     /**
      * Convert sherpa-onnx's float samples (-1..1) to little-endian 16-bit PCM
      * and stream them through [SynthesisCallback.audioAvailable] in chunks no
-     * larger than [SynthesisCallback.maxBufferSize].
+     * larger than [SynthesisCallback.maxBufferSize]. False once playback was stopped.
      */
-    private fun streamPcm(callback: SynthesisCallback, samples: FloatArray) {
+    private fun streamPcm(callback: SynthesisCallback, samples: FloatArray): Boolean {
         val maxBufferBytes = callback.maxBufferSize.coerceAtLeast(BYTES_PER_SAMPLE * 64)
         val chunkBytes = (maxBufferBytes and 0x7FFFFFFE)
         val samplesPerChunk = chunkBytes / BYTES_PER_SAMPLE
@@ -308,9 +322,10 @@ class HayaiTtsService : TextToSpeechService() {
                 buffer[writeIdx + 1] = ((clamped shr 8) and 0xFF).toByte()
                 writeIdx += 2
             }
-            if (callback.audioAvailable(buffer, 0, writeIdx) != TextToSpeech.SUCCESS) return
+            if (callback.audioAvailable(buffer, 0, writeIdx) != TextToSpeech.SUCCESS) return false
             sampleCursor += take
         }
+        return !stopRequested
     }
 
     private companion object {

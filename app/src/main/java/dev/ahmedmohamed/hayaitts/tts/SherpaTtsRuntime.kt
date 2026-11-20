@@ -54,15 +54,37 @@ class SherpaTtsRuntime private constructor(
 
     /** [frontend] is null when sherpa-onnx reads the text itself (lexicon / character models). */
     private class Engine(val tts: OfflineTts, val frontend: PhonemeFrontend?) {
+        /**
+         * [onChunk] gets each sentence's audio as soon as it exists; returning 0 stops. It is
+         * driven from here, not through sherpa's native callback: that JNI looks the lambda up as
+         * invoke([F)Ljava/lang/Integer;, which Kotlin's invokedynamic lambdas lack, and the
+         * pending NoSuchMethodError aborts the process under CheckJNI.
+         */
         fun generate(text: String, sid: Int, speed: Float, onChunk: ((FloatArray) -> Int)? = null): GeneratedAudio {
             val phonemes = frontend?.phonemize(text)?.takeIf { it.isNotEmpty() }
-                ?: return if (onChunk == null) tts.generate(text, sid, speed) else tts.generateWithCallback(text, sid, speed, onChunk)
-            val cfg = GenerationConfig(sid = sid, speed = speed, phonemeCodepoints = phonemes)
-            // Kokoro's own pipeline keeps its pauses. sherpa's default shrinks every >0.2 s quiet
-            // stretch to a fifth, which drops a word-final click right after the word (a "t")
-            // and cuts paragraph pauses.
-            if (frontend is MisakiFrontend) cfg.silenceScale = 1f
-            return if (onChunk == null) tts.generateWithConfig("", cfg) else tts.generateWithConfigAndCallback("", cfg, onChunk)
+            if (phonemes == null) {
+                // shortcut: lexicon/character models play only once the whole text is done; stream them if they get used for long text.
+                return tts.generate(text, sid, speed).also { onChunk?.invoke(it.samples) }
+            }
+            fun config(ps: Array<IntArray>) = GenerationConfig(sid = sid, speed = speed, phonemeCodepoints = ps).apply {
+                // Kokoro's own pipeline keeps its pauses. sherpa's default shrinks every >0.2 s quiet
+                // stretch to a fifth, which drops a word-final click right after the word (a "t")
+                // and cuts paragraph pauses.
+                if (frontend is MisakiFrontend) silenceScale = 1f
+            }
+            if (onChunk == null) return tts.generateWithConfig("", config(phonemes))
+            val parts = ArrayList<FloatArray>()
+            var sampleRate = tts.sampleRate()
+            for (sentence in phonemes) {
+                val audio = tts.generateWithConfig("", config(arrayOf(sentence)))
+                sampleRate = audio.sampleRate
+                parts += audio.samples
+                if (onChunk(audio.samples) == 0) break
+            }
+            val all = FloatArray(parts.sumOf { it.size })
+            var at = 0
+            for (p in parts) { p.copyInto(all, at); at += p.size }
+            return GeneratedAudio(all, sampleRate)
         }
     }
 
@@ -70,8 +92,14 @@ class SherpaTtsRuntime private constructor(
 
     data class SynthesisOutput(val sampleRate: Int, val samples: FloatArray)
 
-    fun sampleRateOf(voiceId: String, languageHint: String? = null): Int =
-        engine(voiceId, 1f, languageHint = languageHint).tts.sampleRate()
+    /** Loads the engine for these settings if needed: also how callers warm a voice ahead of use. */
+    fun sampleRateOf(
+        voiceId: String,
+        languageHint: String? = null,
+        lengthScale: Float = 1.0f,
+        noiseScale: Float = 0.667f,
+        noiseScaleW: Float = 0.8f,
+    ): Int = engine(voiceId, lengthScale, noiseScale, noiseScaleW, languageHint = languageHint).tts.sampleRate()
 
     fun synthesize(
         voiceId: String,
