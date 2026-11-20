@@ -9,7 +9,9 @@ Only recognised tags are acted on. Anything else, such as `[1]`, `[citation need
 | Tag | Effect |
 |---|---|
 | `[happy]` `[sad]` `[angry]` `[calm]` | The emotion applies until the next emotion tag. |
-| `[sad:40]`, `[sad 40%]`, `[sad:0.4]` | The same emotion at 40 % intensity. Intensity runs from 0 to 125 %. |
+| `[sad:40]`, `[sad 40%]`, `[sad:0.4]` | The same emotion at 40 % intensity. Intensity runs from 0 to 200 %. |
+| `[angry:150]` mid-sentence | Changing only the intensity of the current emotion ramps it within the same utterance, so the sentence keeps flowing. `[angry]` brings it back down. |
+| `*word*`, `**several words**` | Emphasis: a local pitch lift, more energy and a little extra length. `**` is stronger. A lone `*`, as in "5 * 3", is read as written. |
 | `[neutral]` / `[default]` | Ends the emotion. |
 | `[pause]`, `[pause=800ms]`, `[break 1.5s]` | Silence. The default is 500 ms, and a number with no unit means milliseconds. |
 | `[rate=0.8]`, `[rate=+20%]`, `[rate]` | A speed multiplier. A bare `[rate]` resets it. |
@@ -39,11 +41,11 @@ Bracket tags are read as text inside SSML.
 | `<s>` | A sentence boundary. |
 | `<break time="300ms"/>`, `<break strength="strong"/>` | Silence. The strengths are none 0, x-weak 100, weak 200, medium 400 (the default), strong 700 and x-strong 1200 ms. |
 | `<prosody rate pitch volume>` | Values nest: rate multiplies, while pitch and volume add. See the values listed below this table. |
-| `<emphasis level="strong\|moderate\|reduced">` | Stress +2 / +1 / -1 on each word, through misaki links. |
+| `<emphasis level="strong\|moderate">` | Emphasis, the same as `**…**` / `*…*`. `reduced` has no effect. |
 | `<phoneme alphabet="ipa" ph="nˈiːv">Niamh</phoneme>` | A pronunciation, in Kokoro's phoneme set. |
 | `<sub alias="…">` | Reads the alias instead of the text. |
 | `<say-as interpret-as="characters">` | Spells the text out. |
-| `<mstts:express-as style="sad" styledegree="0.5">` (Azure) | An emotion. `styledegree` is the intensity, from 0.01 to 2, capped at 1.25. |
+| `<mstts:express-as style="sad" styledegree="0.5">` (Azure) | An emotion. `styledegree` is the intensity, from 0.01 to 2. A nested tag with the same style but a different degree ramps within the sentence. |
 | `<amazon:emotion name="excited" intensity="medium">` | An emotion. The intensities are low 0.4, medium 0.7 and high 1.0. |
 
 `<prosody>` values:
@@ -67,10 +69,12 @@ Emotions come from the expressive Kokoro model (`expressive.py`). It adds 8 cont
 
 These are set from presets based on Kokoro Studio's joyful, sad, angry and calm.
 
+Emphasis and mid-sentence intensity changes travel as marker characters (U+E000–E003) inside the phonemes. The model reads them and then drops them; voices without the expressive model never see them.
+
 **Linux:** intensity and pitch can take any value.
 
 **Phone:** the expressive bundle holds 45 fixed rows, listed in `expressive.txt`:
 - emotions at 50 % and 100 %
 - pitch at −4, −2, 0, +2 and +4 st
 
-The phone uses the nearest row. Rate and volume are applied per segment, and work on every voice.
+The phone uses the nearest row and adds level markers to reach the exact intensity, so 200 % plays from the 100 % row. Rate and volume are applied per segment and work on every voice.

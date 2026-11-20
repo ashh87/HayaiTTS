@@ -4,6 +4,7 @@ import android.content.Context
 import com.github.csukuangfj.piper.phonemize.piperPhonemizeInitialize
 import com.github.csukuangfj.piper.phonemize.piperPhonemizeText
 import dev.ahmedmohamed.hayaitts.tts.g2p.MisakiEnglish
+import dev.ahmedmohamed.hayaitts.tts.markup.Markup
 
 /**
  * sherpa-onnx 2.x no longer bundles espeak-ng, so voices that relied on it
@@ -41,14 +42,29 @@ object Espeak {
  */
 class MisakiFrontend(private val g2p: MisakiEnglish) : PhonemeFrontend {
     override fun phonemize(text: String): Array<IntArray> =
-        text.split(PARAGRAPHS)
-            .flatMap { chunks(g2p.phonemize(it)) }
-            .filter { it.isNotBlank() }
+        carryMarkers(
+            text.split(PARAGRAPHS)
+                .flatMap { chunks(g2p.phonemize(it)) }
+                .filter { c -> c.any { it != ' ' && it !in Markup.MARKERS } },
+        )
             .map { it.codePoints().toArray() }
             .toTypedArray()
 
     companion object {
         private const val MAX_CHUNK = 400
+
+        /** Starts each chunk with the emphasis/level state earlier chunks left open (expressive.py's carry_markers). */
+        internal fun carryMarkers(chunks: List<String>): List<String> {
+            var emph = 0
+            var level = 0
+            return chunks.map { c ->
+                val prefix = Markup.EMPH_ON.toString().repeat(emph) +
+                    (if (level > 0) Markup.LEVEL_UP else Markup.LEVEL_DOWN).toString().repeat(kotlin.math.abs(level))
+                emph = (emph + c.count { it == Markup.EMPH_ON } - c.count { it == Markup.EMPH_OFF }).coerceIn(0, 2)
+                level += c.count { it == Markup.LEVEL_UP } - c.count { it == Markup.LEVEL_DOWN }
+                prefix + c
+            }
+        }
         private val PARAGRAPHS = Regex("\n+")
         private val SENTENCE_END = Regex("(?<=[.!?…]) +")
 

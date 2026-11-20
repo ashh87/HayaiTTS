@@ -96,6 +96,35 @@ class MisakiEnglishTest {
     }
 
     @Test
+    fun `span markers land on the same phonemes as in the kokoro tools`() {
+        // Expected: expressive.phonemes_with_markers (misaki 0.9.4, KPipeline lang "b").
+        val g = g2p(british = true)
+        val cases = listOf(
+            "I \uE000really\uE001 mean it, and I \uE000\uE000never\uE001\uE001 said so." to
+                "ˌI \uE000ɹˈɪəli\uE001 mˈiːn ɪt, and ˌI \uE000\uE000nˈɛvə\uE001\uE001 sˈɛd sˌQ.",
+            "Say \uE000[Niamh](/nˈiːv/)\uE001 twice." to "sˈA \uE000nˈiːv\uE001 twˈIs.",
+            "Put it back where you found it, \uE002\uE002 right now!\uE003\uE003 Thank you." to
+                "pˌʊt ɪt bˈak wˌɛː juː fˈWnd ɪt, \uE002\uE002ɹˈIt nˈW! \uE003\uE003θˈaŋk juː.",
+            "It cost \uE000£1,200\uE001 in 1984." to
+                "ˌɪt kˈɒst \uE000wˈʌn θˈWzᵊnd tˈuː hˈʌndɹəd pˈWndz\uE001 ɪn nˌIntˈiːn ˈAti fˈɔː.",
+            "\uE000Don't\uE001 you \uE000dare\uE001, it's \uE000not\uE001 yours." to
+                "\uE000dˈQnt\uE001 juː \uE000dˈɛː\uE001, ɪts \uE000nˌɒt\uE001 jˈɔːz.",
+        )
+        for ((text, want) in cases) assertEquals(text, want, g.phonemize(text))
+    }
+
+    @Test
+    fun `chunks carry open emphasis and level markers forward`() {
+        val carried = dev.ahmedmohamed.hayaitts.tts.MisakiFrontend.carryMarkers(
+            listOf("a \uE000b \uE002\uE002c.", "d\uE001 e.", "f \uE003g.", "h."),
+        )
+        assertEquals(
+            listOf("a \uE000b \uE002\uE002c.", "\uE000\uE002\uE002d\uE001 e.", "\uE002\uE002f \uE003g.", "\uE002h."),
+            carried,
+        )
+    }
+
+    @Test
     fun `long phoneme runs are cut at punctuation under sherpa's limit`() {
         val long = (1..120).joinToString(", ") { "wˈʌn" } + ". ʃˈɔːt."
         val chunks = dev.ahmedmohamed.hayaitts.tts.MisakiFrontend.chunks(long)

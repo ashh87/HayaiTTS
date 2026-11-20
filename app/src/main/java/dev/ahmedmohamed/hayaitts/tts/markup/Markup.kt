@@ -10,6 +10,8 @@ import kotlin.math.min
  *  - square-bracket tags anywhere: [sad], [happy:40], [pause=800ms], [rate=0.9], [pitch=+2st], [volume=-3dB]
  *  - SSML, only when the text starts with <speak>
  *
+ * Emphasis (*word*, **word**, <emphasis>) and intensity changes inside a segment become
+ * [MARKERS] the expressive Kokoro model reads, so the sentence stays one utterance.
  * Only recognised tags are consumed: "[1]" or "a < b" read as written, and misaki links
  * like [word](/ipa/) pass through untouched for the G2P.
  */
@@ -42,8 +44,19 @@ object Markup {
     private val RATE_WORDS = mapOf("x-slow" to 0.6, "slow" to 0.8, "medium" to 1.0, "default" to 1.0, "fast" to 1.2, "x-fast" to 1.4)
     private val PITCH_WORDS = mapOf("x-low" to -6.0, "low" to -3.0, "medium" to 0.0, "default" to 0.0, "high" to 3.0, "x-high" to 6.0)
     private val VOLUME_WORDS = mapOf("silent" to -60.0, "x-soft" to -12.0, "soft" to -6.0, "medium" to 0.0, "default" to 0.0, "loud" to 4.0, "x-loud" to 8.0)
-    private val EMPHASIS = mapOf("strong" to "+2", "moderate" to "+1", "reduced" to "-1")
+    private val EMPHASIS = mapOf("strong" to 2, "moderate" to 1) // marker levels; "reduced" is a no-op
     private val AMAZON_INTENSITY = mapOf("low" to 0.4, "medium" to 0.7, "high" to 1.0)
+    const val MAX_INTENSITY = 2.0
+
+    // The expressive model's span markers (private-use characters; kokoro tools' expressive.py).
+    const val EMPH_ON = '\uE000'
+    const val EMPH_OFF = '\uE001'
+    const val LEVEL_UP = '\uE002'
+    const val LEVEL_DOWN = '\uE003'
+    const val MARKERS = "$EMPH_ON$EMPH_OFF$LEVEL_UP$LEVEL_DOWN"
+    const val LEVEL_STEP = 0.25
+
+    fun stripMarkers(s: String): String = s.filterNot { it in MARKERS }
 
     private data class Style(
         val emotion: String? = null,
@@ -108,16 +121,25 @@ object Markup {
         val pct = s.endsWith("%")
         val v = num(s.trimEnd('%').trim()) ?: return null
         if (v < 0) return null
-        return min(if (pct || v > 1.25) v / 100 else v, 1.25)
+        return min(if (pct || v > MAX_INTENSITY) v / 100 else v, MAX_INTENSITY)
     }
 
     private class Builder {
         val out = mutableListOf<Segment>()
         private val buf = StringBuilder()
         private var style = Style()
+        private var level = 0 // marker level relative to the segment's starting intensity
 
         fun text(t: String, s: Style) {
-            if (s != style) {
+            val cur = style
+            if (s.emotion != null && cur.intensity > 0 && s.copy(intensity = cur.intensity) == cur &&
+                buf.any { it !in MARKERS && it != ' ' && it != '\t' }
+            ) {
+                // same emotion, mid-segment: intensity changes ramp with markers inside one utterance
+                val target = kotlin.math.round((s.intensity / cur.intensity - 1) / LEVEL_STEP).toInt() // half-even, as Python round()
+                repeat(kotlin.math.abs(target - level)) { buf.append(if (target > level) LEVEL_UP else LEVEL_DOWN) }
+                level = target
+            } else if (s != cur) {
                 flush()
                 style = s
             }
@@ -127,7 +149,8 @@ object Markup {
         fun flush() {
             val t = buf.toString().replace(SPACES, " ").trim()
             buf.clear()
-            if (t.isNotEmpty()) {
+            level = 0
+            if (t.any { it !in MARKERS }) {
                 out += Segment(t, style.emotion, if (style.emotion != null) style.intensity else 1.0, style.rate, style.pitch, style.volume)
             }
         }
@@ -146,6 +169,14 @@ object Markup {
     }
 
     private val SPACES = Regex("[ \t]+")
+
+    private val STARS = Regex("""(?<![\w*])(\*{1,2})(?=[^\s*])([^*\n]*?[^\s*])\1(?![\w*])""")
+
+    /** *word* / **words** -> emphasis markers (1 or 2 levels). A lone * ("5 * 3") stays. */
+    private fun stars(text: String): String = STARS.replace(text) { m ->
+        val n = m.groupValues[1].length
+        EMPH_ON.toString().repeat(n) + m.groupValues[2] + EMPH_OFF.toString().repeat(n)
+    }
 
     // ---- square-bracket tags ----
     private val BRACKET = Regex("""\[([^\[\]\n]{1,40})\](?!\()""")
@@ -171,7 +202,8 @@ object Markup {
         }
     }
 
-    private fun parseBrackets(text: String): List<Segment> {
+    private fun parseBrackets(text0: String): List<Segment> {
+        val text = stars(text0)
         val b = Builder()
         var style = Style()
         var at = 0
@@ -192,7 +224,6 @@ object Markup {
         RegexOption.DOT_MATCHES_ALL,
     )
     private val ATTR = Regex("""([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
-    private val WORD = Regex("""\p{L}[\p{L}\p{N}_'’-]*""")
     private val ENTITY = Regex("""&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);""")
     private val NAMED = mapOf("amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to " ")
 
@@ -260,7 +291,7 @@ object Markup {
                     val e = emotionOf(a["style"] ?: a["name"] ?: "")
                     if (e is Emotion.Is) {
                         val i = if ("styledegree" in a) { // Azure: a 0.01..2 multiplier
-                            num(a.getValue("styledegree"))?.takeIf { it > 0 }?.let { min(it, 1.25) } ?: 1.0
+                            num(a.getValue("styledegree"))?.takeIf { it > 0 }?.let { min(it, MAX_INTENSITY) } ?: 1.0
                         } else { // Amazon: low/medium/high; also accept 40% or 0.4
                             val deg = a["intensity"] ?: ""
                             AMAZON_INTENSITY[deg.lowercase()] ?: parseIntensity(deg)?.takeIf { it != 0.0 } ?: 1.0
@@ -268,8 +299,8 @@ object Markup {
                         style = style.copy(emotion = e.name, intensity = if (e.name != null) i else 1.0)
                     }
                 }
-                "emphasis" -> EMPHASIS[(a["level"] ?: "moderate").lowercase()]?.let { f ->
-                    xf = { t -> WORD.replace(t) { w -> "[${w.value}]($f)" } }
+                "emphasis" -> EMPHASIS[(a["level"] ?: "moderate").lowercase()]?.let { n ->
+                    xf = { t -> if (t.isNotBlank()) EMPH_ON.toString().repeat(n) + t + EMPH_OFF.toString().repeat(n) else t }
                 }
                 "phoneme" -> {
                     val ph = (a["ph"] ?: "").trim().trim('/')

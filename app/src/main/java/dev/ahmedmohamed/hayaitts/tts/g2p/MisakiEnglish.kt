@@ -49,13 +49,21 @@ class MisakiEnglish(
 
     /** Phonemes for [text], joined the way KPipeline.en_tokenize joins them. */
     fun phonemize(text: String): String {
-        val pre = preprocess(text)
+        val pre = withoutMarkers(preprocess(text))
         val toks = tokenizer.tokenize(pre.text)
         return if (toks.isEmpty()) "" else phonemize(toks, tagger.tag(toks.map { it.text }), pre)
     }
 
-    /** G2P.preprocess: the text without link markup, its whitespace-split words, and link features by word index. */
-    internal class Preprocessed(val text: String, val words: List<String>, val features: Map<Int, Any>)
+    /**
+     * G2P.preprocess: the text without link markup, its whitespace-split words, and link features
+     * by word index; [marks] are span markers (Markup.MARKERS) taken out of the text, by offset.
+     */
+    internal class Preprocessed(
+        val text: String,
+        val words: List<String>,
+        val features: Map<Int, Any>,
+        val marks: List<Pair<Int, Char>> = emptyList(),
+    )
 
     /** Tokens and POS tags supplied by the caller (tests feed spaCy's own here). */
     internal fun phonemize(toks: List<EnglishTokenizer.Token>, tags: List<String>, pre: Preprocessed? = null): String {
@@ -118,10 +126,10 @@ class MisakiEnglish(
         }
         @Suppress("UNCHECKED_CAST")
         val merged = words.map { if (it is MToken) it else mergeTokens(it as List<MToken>, unk = "") }
+        val ps = merged.map { (it.phonemes ?: "").replace('ɾ', 'T').replace('ʔ', 't') }.toMutableList()
+        if (pre != null && pre.marks.isNotEmpty() && merged.isNotEmpty()) attachMarkers(merged, ps, pre.marks)
         // Kokoro v1.0 (version != '2.0') + KPipeline.en_tokenize: phonemes + one space per whitespace.
-        return merged.joinToString("") { tk ->
-            (tk.phonemes ?: "").replace('ɾ', 'T').replace('ʔ', 't') + if (tk.whitespace.isNotEmpty()) " " else ""
-        }.trim()
+        return merged.indices.joinToString("") { i -> ps[i] + if (merged[i].whitespace.isNotEmpty()) " " else "" }.trim()
     }
 
     /**
@@ -150,6 +158,30 @@ class MisakiEnglish(
                     tk.rating = 5
                 }
                 // shortcut: "#flags#" number features are parsed but not applied; add num_flags if a voice needs them.
+            }
+        }
+    }
+
+    /**
+     * Markers back onto the phonemes (expressive.py's _attach): openers and levels go before the
+     * next token starting at or after their offset, EMPH_OFF after the last token ending at or before it.
+     */
+    private fun attachMarkers(tokens: List<MToken>, ps: MutableList<String>, marks: List<Pair<Int, Char>>) {
+        val starts = IntArray(tokens.size)
+        val ends = IntArray(tokens.size)
+        var pos = 0
+        for ((i, tk) in tokens.withIndex()) {
+            starts[i] = pos
+            ends[i] = pos + tk.text.length
+            pos = ends[i] + tk.whitespace.length
+        }
+        for ((o, m) in marks) {
+            if (m == EMPH_OFF) {
+                val i = (tokens.indices.lastOrNull { ends[it] <= o }) ?: 0
+                ps[i] = ps[i] + m
+            } else {
+                val i = tokens.indices.firstOrNull { starts[it] >= o } ?: tokens.lastIndex
+                ps[i] = m + ps[i]
             }
         }
     }
@@ -600,6 +632,28 @@ class MisakiEnglish(
 
         private val LINK = Regex("""\[([^\]]+)\]\(([^)]*)\)""")
         private val WHITESPACE = Regex("""\s+""")
+
+        private const val EMPH_OFF = ''
+        private const val MARKERS = "" // = Markup.MARKERS
+
+        /** Takes span markers out of the preprocessed text, remapping link features to the remaining words. */
+        internal fun withoutMarkers(pre: Preprocessed): Preprocessed {
+            if (pre.text.none { it in MARKERS }) return pre
+            val clean = StringBuilder()
+            val marks = mutableListOf<Pair<Int, Char>>()
+            for (c in pre.text) if (c in MARKERS) marks += clean.length to c else clean.append(c)
+            val kept = mutableListOf<String>()
+            val remap = HashMap<Int, Int>()
+            for ((i, w) in pre.words.withIndex()) {
+                val bare = w.filterNot { it in MARKERS }
+                if (bare.isNotEmpty()) {
+                    remap[i] = kept.size
+                    kept += bare
+                }
+            }
+            val features = pre.features.mapNotNull { (k, v) -> remap[k]?.let { it to v } }.toMap()
+            return Preprocessed(clean.toString(), kept, features, marks)
+        }
 
         /** misaki G2P.preprocess. */
         internal fun preprocess(text0: String): Preprocessed {

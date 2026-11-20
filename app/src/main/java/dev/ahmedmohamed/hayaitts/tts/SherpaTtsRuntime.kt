@@ -233,10 +233,14 @@ class SherpaTtsRuntime private constructor(
         }
         for (seg in Markup.parse(text)) {
             if (seg.text.isNotBlank()) {
-                val segSid = engine.expressive?.takeIf { sid == 0 }?.sidFor(seg.emotion, seg.intensity, seg.pitch) ?: sid
+                val rows = engine.expressive?.takeIf { sid == 0 }
+                val row = rows?.rowFor(seg.emotion, seg.intensity, seg.pitch)
+                val segSid = row?.sid ?: sid
+                // Span markers only mean something to the expressive model; others would read them as junk.
+                val segText = if (row != null) rows.bridge(row, seg.intensity) + seg.text else Markup.stripMarkers(seg.text)
                 val gain = Math.pow(10.0, seg.volume / 20).toFloat()
                 synthesizeStreaming(
-                    voiceId, seg.text, segSid, (speed * seg.rate).toFloat().coerceIn(0.25f, 4f), pitch,
+                    voiceId, segText, segSid, (speed * seg.rate).toFloat().coerceIn(0.25f, 4f), pitch,
                     lengthScale, noiseScale, noiseScaleW, languageHint,
                 ) { chunk ->
                     if (gain != 1f) for (i in chunk.indices) chunk[i] *= gain

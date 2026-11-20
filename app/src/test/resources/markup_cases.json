@@ -411,7 +411,7 @@
   "input": "<speak>I <emphasis level=\"strong\">really</emphasis> mean <emphasis>it now</emphasis>.</speak>",
   "segments": [
    {
-    "text": "I [really](+2) mean [it](+1) [now](+1).",
+    "text": "I really mean it now.",
     "emotion": null,
     "intensity": 1.0,
     "rate": 1.0,
@@ -531,6 +531,113 @@
     "emotion": null,
     "intensity": 1.0,
     "rate": 1.2,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "I *really* mean it, and I **never** said that.",
+  "segments": [
+   {
+    "text": "I really mean it, and I never said that.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "5 * 3 = 15, a*b and 2*x* stay; ** alone too.",
+  "segments": [
+   {
+    "text": "5 * 3 = 15, a*b and 2*x* stay; ** alone too.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[angry] I told you three times already. Put it back where you found it, [angry:150] right now! [angry] Thank you.",
+  "segments": [
+   {
+    "text": "I told you three times already. Put it back where you found it,  right now!  Thank you.",
+    "emotion": "angry",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[sad:40] Quiet, [sad:80] louder. [sad:2] Doubled, [sad:250] capped.",
+  "segments": [
+   {
+    "text": "Quiet,  louder.  Doubled, capped.",
+    "emotion": "sad",
+    "intensity": 0.4,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[happy] Up [rate=1.2] faster [happy:150] and brighter.",
+  "segments": [
+   {
+    "text": "Up",
+    "emotion": "happy",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "faster  and brighter.",
+    "emotion": "happy",
+    "intensity": 1.0,
+    "rate": 1.2,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak><mstts:express-as style=\"angry\" styledegree=\"1\">Put it back, <mstts:express-as style=\"angry\" styledegree=\"1.5\">right now!</mstts:express-as> Thanks.</mstts:express-as></speak>",
+  "segments": [
+   {
+    "text": "Put it back, right now! Thanks.",
+    "emotion": "angry",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak>Say <emphasis level=\"reduced\">this</emphasis> <emphasis level=\"none\">plainly</emphasis>.</speak>",
+  "segments": [
+   {
+    "text": "Say this plainly.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
     "pitch": 0.0,
     "volume": 0.0,
     "pause_ms": 0
