@@ -48,15 +48,20 @@ object MisakiAssets {
         return Triple(tok, tag, accent)
     }
 
-    /** Like the desktop add_custom_words(): golds[word] = golds[word.lower()] = phonemes. */
+    /**
+     * Like the desktop add_custom_words(): word, lowercase and Capitalised forms all map to
+     * the phonemes (misaki only grows its own dictionaries that way, at load time).
+     */
     internal fun loadCustomWords(file: File): Map<String, Any> {
         if (!file.isFile) return emptyMap()
         val out = HashMap<String, Any>()
         file.forEachLine { raw ->
             val parts = raw.substringBefore('#').trim().split(Regex("\\s+"))
             if (parts.size == 2) {
+                val lower = parts[0].lowercase()
                 out[parts[0]] = parts[1]
-                out[parts[0].lowercase()] = parts[1]
+                out[lower] = parts[1]
+                out[lower.replaceFirstChar { it.titlecase() }] = parts[1]
             }
         }
         return out

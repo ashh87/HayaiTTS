@@ -68,15 +68,20 @@ class MisakiEnglishTest {
     }
 
     @Test
-    fun `custom words override the dictionary`() {
+    fun `custom words override the dictionary in any case`() {
+        val tsv = File.createTempFile("pronunciations", ".tsv").apply {
+            deleteOnExit()
+            writeText("# comment\nniamh\tnˈiːv\nnormalé  nˌɔːmˈɑɑlˈɛː\n")
+        }
         val g = MisakiEnglish(
             true,
-            MisakiEnglish.Dict(PackedTable.file(File(ASSETS, "gb_gold.kv")), mapOf("niamh" to "nˈiːv", "Niamh" to "nˈiːv")),
+            MisakiEnglish.Dict(PackedTable.file(File(ASSETS, "gb_gold.kv")), MisakiAssets.loadCustomWords(tsv)),
             MisakiEnglish.Dict(null),
             tokenizer,
             tagger,
         ) { null }
         assertEquals("həlˈQ nˈiːv.", g.phonemize("Hello Niamh."))
+        assertEquals("nˌɔːmˈɑɑlˈɛː, nˌɔːmˈɑɑlˈɛː.", g.phonemize("Normalé, normalé."))
     }
 
     @Test

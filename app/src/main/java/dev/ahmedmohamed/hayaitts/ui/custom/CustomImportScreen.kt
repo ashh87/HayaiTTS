@@ -291,7 +291,8 @@ private fun ConfirmBody(
             text = stringResource(R.string.import_speakers_header, confirm.analysis.speakers.size),
             style = MaterialTheme.typography.titleSmall,
         )
-        if (confirm.analysis.speakers.size <= 1) {
+        // The analyzer's fallback when the bundle has no speakers.txt or speaker JSON
+        if (confirm.analysis.speakers.singleOrNull()?.name == "default") {
             Text(
                 text = stringResource(R.string.import_no_speakers),
                 style = MaterialTheme.typography.bodySmall,

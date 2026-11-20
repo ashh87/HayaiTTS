@@ -58,6 +58,10 @@ class SherpaTtsRuntime private constructor(
             val phonemes = frontend?.phonemize(text)?.takeIf { it.isNotEmpty() }
                 ?: return if (onChunk == null) tts.generate(text, sid, speed) else tts.generateWithCallback(text, sid, speed, onChunk)
             val cfg = GenerationConfig(sid = sid, speed = speed, phonemeCodepoints = phonemes)
+            // Kokoro's own pipeline keeps its pauses. sherpa's default shrinks every >0.2 s quiet
+            // stretch to a fifth, which drops a word-final click right after the word (a "t")
+            // and cuts paragraph pauses.
+            if (frontend is MisakiFrontend) cfg.silenceScale = 1f
             return if (onChunk == null) tts.generateWithConfig("", cfg) else tts.generateWithConfigAndCallback("", cfg, onChunk)
         }
     }
@@ -413,7 +417,10 @@ class SherpaTtsRuntime private constructor(
         kokoroLanguage: String,
         tts: OfflineTts,
     ): PhonemeFrontend? {
-        if (!File(dir, ESPEAK_DIR).isDirectory) return null
+        // Kokoro always needs phonemes from us (sherpa 2 has no espeak) and the espeak data
+        // comes from the APK, so single-voice bundles may leave espeak-ng-data out. For the
+        // others its presence is what marks an espeak voice rather than a lexicon one.
+        if (family != ModelFamily.KOKORO && !File(dir, ESPEAK_DIR).isDirectory) return null
         fun espeak(espeakVoice: String) = PhonemeFrontend { text ->
             Espeak.phonemize(context, text, espeakVoice).map { it.codePoints().toArray() }.toTypedArray()
         }
