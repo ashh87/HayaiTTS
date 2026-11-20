@@ -21,6 +21,8 @@ import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.ModelFamily
 import dev.ahmedmohamed.hayaitts.domain.repo.SettingsRepository
 import dev.ahmedmohamed.hayaitts.tts.g2p.MisakiAssets
+import dev.ahmedmohamed.hayaitts.tts.markup.ExpressiveRows
+import dev.ahmedmohamed.hayaitts.tts.markup.Markup
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
@@ -52,8 +54,11 @@ class SherpaTtsRuntime private constructor(
         val maxNumSentences: Int
     )
 
-    /** [frontend] is null when sherpa-onnx reads the text itself (lexicon / character models). */
-    private class Engine(val tts: OfflineTts, val frontend: PhonemeFrontend?) {
+    /**
+     * [frontend] is null when sherpa-onnx reads the text itself (lexicon / character models).
+     * [expressive] is set for voices built with the expressive Kokoro model (expressive.txt).
+     */
+    private class Engine(val tts: OfflineTts, val frontend: PhonemeFrontend?, val expressive: ExpressiveRows? = null) {
         /**
          * [onChunk] gets each sentence's audio as soon as it exists; returning 0 stops. It is
          * driven from here, not through sherpa's native callback: that JNI looks the lambda up as
@@ -197,6 +202,54 @@ class SherpaTtsRuntime private constructor(
             )
         }
         return SynthesisOutput(sampleRate = audio.sampleRate, samples = audio.samples)
+    }
+
+    /**
+     * [text] may carry markup (docs/MARKUP.md): [sad], [pause=800ms], <speak> SSML, …
+     * Each segment is generated sentence by sentence and handed to [onChunk] as it lands
+     * (returning 0 stops); pauses arrive as silent chunks. Emotion and pitch pick a row of
+     * an expressive voice when [sid] is its base speaker (0); other voices still get pauses,
+     * rate and volume. Without [onChunk] the whole result is returned instead.
+     */
+    fun synthesizeMarkup(
+        voiceId: String,
+        text: String,
+        sid: Int = 0,
+        speed: Float = 1.0f,
+        pitch: Float = 1.0f,
+        lengthScale: Float = 1.0f,
+        noiseScale: Float = 0.667f,
+        noiseScaleW: Float = 0.8f,
+        languageHint: String? = null,
+        onChunk: ((FloatArray) -> Int)? = null,
+    ): SynthesisOutput {
+        val engine = engine(voiceId, lengthScale, noiseScale, noiseScaleW, text, languageHint)
+        val sampleRate = engine.tts.sampleRate()
+        val collected = ArrayList<FloatArray>()
+        var go = true
+        fun emit(chunk: FloatArray): Int {
+            if (onChunk == null) collected += chunk else if (onChunk(chunk) == 0) go = false
+            return if (go) 1 else 0
+        }
+        for (seg in Markup.parse(text)) {
+            if (seg.text.isNotBlank()) {
+                val segSid = engine.expressive?.takeIf { sid == 0 }?.sidFor(seg.emotion, seg.intensity, seg.pitch) ?: sid
+                val gain = Math.pow(10.0, seg.volume / 20).toFloat()
+                synthesizeStreaming(
+                    voiceId, seg.text, segSid, (speed * seg.rate).toFloat().coerceIn(0.25f, 4f), pitch,
+                    lengthScale, noiseScale, noiseScaleW, languageHint,
+                ) { chunk ->
+                    if (gain != 1f) for (i in chunk.indices) chunk[i] *= gain
+                    emit(chunk)
+                }
+            }
+            if (go && seg.pauseMs > 0) emit(FloatArray(sampleRate * seg.pauseMs / 1000))
+            if (!go) break
+        }
+        val all = FloatArray(collected.sumOf { it.size })
+        var at = 0
+        for (c in collected) { c.copyInto(all, at); at += c.size }
+        return SynthesisOutput(sampleRate, all)
     }
 
     /**
@@ -434,7 +487,7 @@ class SherpaTtsRuntime private constructor(
         val config = buildConfig(family, voiceDir, kokoroLanguage, lengthScale, noiseScale, noiseScaleW, useNnapi, numThreads, maxNumSentences)
         val tts = OfflineTts(assetManager = null, config = config)
         log.i { "OfflineTts ready for ${voice.voiceId} (sampleRate=${tts.sampleRate()})" }
-        return Engine(tts, frontendFor(family, voiceDir, voice, kokoroLanguage, tts))
+        return Engine(tts, frontendFor(family, voiceDir, voice, kokoroLanguage, tts), ExpressiveRows.read(voiceDir))
     }
 
     /** Matches what sherpa-onnx 1.x did internally: espeak wherever the bundle shipped espeak-ng-data. */

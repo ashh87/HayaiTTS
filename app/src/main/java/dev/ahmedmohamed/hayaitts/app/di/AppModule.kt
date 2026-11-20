@@ -89,9 +89,6 @@ val appModule = module {
     single { get<HayaiTtsDatabase>().pronunciationDao() }
     single { get<HayaiTtsDatabase>().appRouteDao() }
 
-    // Phase 7c: SSML preprocessor singleton — purely functional, no Android deps.
-    single { dev.ahmedmohamed.hayaitts.data.ssml.SsmlPreprocessor() }
-
     // Repositories. Bind both the interface and the impl class so callers can
     // pick either (the TTS service grabs the impl for the snapshot helper).
     single<SettingsRepository> { SettingsRepositoryImpl(androidContext()) }

@@ -85,6 +85,17 @@ class MisakiEnglishTest {
     }
 
     @Test
+    fun `markdown links set phonemes and stress as misaki does`() {
+        // Expected: misaki 0.9.4 via KPipeline(lang_code="b").
+        val g = g2p(british = true)
+        assertEquals("sˈA nˈiːv plˈiːz.", g.phonemize("Say [Niamh](/nˈiːv/) please."))
+        assertEquals("ˌI ɹˈɪəli mˈiːn ˌɪt nˈW.", g.phonemize("I [really](+2) mean [it](+1) [now](+1)."))
+        assertEquals("ɹˈiːd ðə ɹɪkˈɔːd əlˈWd.", g.phonemize("Read [the](-1) [record](/ɹɪkˈɔːd/) aloud."))
+        assertEquals("ˌɪt wɒz ɹɪdjˌuːst ɐ lˈɒt.", g.phonemize("It was [reduced](-1) a lot."))
+        assertEquals("ðə kˈat sˈat.", g.phonemize("The [cat](0.5) sat."))
+    }
+
+    @Test
     fun `long phoneme runs are cut at punctuation under sherpa's limit`() {
         val long = (1..120).joinToString(", ") { "wˈʌn" } + ". ʃˈɔːt."
         val chunks = dev.ahmedmohamed.hayaitts.tts.MisakiFrontend.chunks(long)

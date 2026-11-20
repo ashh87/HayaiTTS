@@ -1,0 +1,544 @@
+[
+ {
+  "input": "Just plain text, nothing to see.",
+  "segments": [
+   {
+    "text": "Just plain text, nothing to see.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "See note [1] and [citation needed], a < b > c.",
+  "segments": [
+   {
+    "text": "See note [1] and [citation needed], a < b > c.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "Say [Niamh](/nˈiːv/) and [read](+1) as written.",
+  "segments": [
+   {
+    "text": "Say [Niamh](/nˈiːv/) and [read](+1) as written.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[happy] What a day! [sad] It rained. [neutral] Anyway.",
+  "segments": [
+   {
+    "text": "What a day!",
+    "emotion": "happy",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "It rained.",
+    "emotion": "sad",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Anyway.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[SAD:40] Quietly. [happy 80%] Brightly. [angry: 0.5] Crossly.",
+  "segments": [
+   {
+    "text": "Quietly.",
+    "emotion": "sad",
+    "intensity": 0.4,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Brightly.",
+    "emotion": "happy",
+    "intensity": 0.8,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Crossly.",
+    "emotion": "angry",
+    "intensity": 0.5,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[joyful] Alias. [furious] Alias. [gentle] Alias.",
+  "segments": [
+   {
+    "text": "Alias.",
+    "emotion": "happy",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Alias.",
+    "emotion": "angry",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Alias.",
+    "emotion": "calm",
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "First.[pause]Second. [pause=800ms] Third. [break 1.5s] Fourth.",
+  "segments": [
+   {
+    "text": "First.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 500
+   },
+   {
+    "text": "Second.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 800
+   },
+   {
+    "text": "Third.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 1500
+   },
+   {
+    "text": "Fourth.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[pause=250] Leading pause.",
+  "segments": [
+   {
+    "text": "",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 250
+   },
+   {
+    "text": "Leading pause.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[rate=0.8] Slow. [rate=+20%] Faster. [rate] Normal.",
+  "segments": [
+   {
+    "text": "Slow.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 0.8,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Faster.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.2,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Normal.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[pitch=+2st] Higher. [pitch=-10%] Lower. [volume=-6dB] Quieter.",
+  "segments": [
+   {
+    "text": "Higher.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 2.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Lower.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": -1.8240371213405995,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Quieter.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": -1.8240371213405995,
+    "volume": -6.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "[sad:abc] stays, [pause=soon] stays, [laughs] stays.",
+  "segments": [
+   {
+    "text": "[sad:abc] stays, [pause=soon] stays, [laughs] stays.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak>Hello <break time=\"300ms\"/> world. <break strength=\"strong\"/> Bye.</speak>",
+  "segments": [
+   {
+    "text": "Hello",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 300
+   },
+   {
+    "text": "world.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 700
+   },
+   {
+    "text": "Bye.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak><p>One para.</p><p>Two <s>sentences</s> here.</p></speak>",
+  "segments": [
+   {
+    "text": "One para.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 500
+   },
+   {
+    "text": "Two sentences",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "here.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 500
+   }
+  ]
+ },
+ {
+  "input": "<speak><prosody rate=\"slow\" pitch=\"+2st\" volume=\"loud\">Slow high loud <prosody rate=\"50%\">half again</prosody> back.</prosody> Normal.</speak>",
+  "segments": [
+   {
+    "text": "Slow high loud",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 0.8,
+    "pitch": 2.0,
+    "volume": 4.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "half again",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 0.4,
+    "pitch": 2.0,
+    "volume": 4.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "back.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 0.8,
+    "pitch": 2.0,
+    "volume": 4.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Normal.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak><prosody pitch=\"x-low\" rate=\"+10%\">Low.</prosody><prosody pitch=\"120Hz\">Hz ignored.</prosody></speak>",
+  "segments": [
+   {
+    "text": "Low.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.1,
+    "pitch": -6.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Hz ignored.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak>I <emphasis level=\"strong\">really</emphasis> mean <emphasis>it now</emphasis>.</speak>",
+  "segments": [
+   {
+    "text": "I [really](+2) mean [it](+1) [now](+1).",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak>Say <phoneme alphabet=\"ipa\" ph=\"nˈiːv\">Niamh</phoneme> please.</speak>",
+  "segments": [
+   {
+    "text": "Say [Niamh](/nˈiːv/) please.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak><sub alias=\"World Wide Web Consortium\">W3C</sub> and <say-as interpret-as=\"characters\">BBC</say-as>.</speak>",
+  "segments": [
+   {
+    "text": "World Wide Web Consortium and B B C.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak xmlns:mstts=\"https://www.w3.org/2001/mstts\"><mstts:express-as style=\"sad\" styledegree=\"0.5\">Sorry.</mstts:express-as> Fine.</speak>",
+  "segments": [
+   {
+    "text": "Sorry.",
+    "emotion": "sad",
+    "intensity": 0.5,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "Fine.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak><amazon:emotion name=\"excited\" intensity=\"medium\">Great news!</amazon:emotion></speak>",
+  "segments": [
+   {
+    "text": "Great news!",
+    "emotion": "happy",
+    "intensity": 0.7,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak>Fish &amp; chips &lt;3 [happy] brackets read as text in SSML.</speak>",
+  "segments": [
+   {
+    "text": "Fish & chips <3 [happy] brackets read as text in SSML.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak><unknown attr=\"x\">Kept text</unknown> <!-- comment --> end.</speak>",
+  "segments": [
+   {
+    "text": "Kept text end.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "<speak>Unclosed <prosody rate=\"fast\">tag runs to the end.</speak>",
+  "segments": [
+   {
+    "text": "Unclosed",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.0,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   },
+   {
+    "text": "tag runs to the end.",
+    "emotion": null,
+    "intensity": 1.0,
+    "rate": 1.2,
+    "pitch": 0.0,
+    "volume": 0.0,
+    "pause_ms": 0
+   }
+  ]
+ },
+ {
+  "input": "",
+  "segments": []
+ }
+]

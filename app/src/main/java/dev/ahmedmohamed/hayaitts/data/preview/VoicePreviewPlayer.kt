@@ -54,7 +54,7 @@ class VoicePreviewPlayer(
         tuning: VoiceTuning,
     ): SherpaTtsRuntime.SynthesisOutput? = withContext(dispatchers.default) {
         runCatching {
-            runtime.synthesize(
+            runtime.synthesizeMarkup(
                 voiceId = voiceId, text = text, sid = sid,
                 speed = tuning.speed, pitch = tuning.pitch, lengthScale = tuning.lengthScale,
                 noiseScale = tuning.noiseScale, noiseScaleW = tuning.noiseScaleW,

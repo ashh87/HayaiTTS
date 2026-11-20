@@ -6,8 +6,8 @@ import java.text.Normalizer
  * Kotlin port of misaki's English G2P (hexgrad/misaki `en.py` + `espeak.py`,
  * Apache-2.0) as Kokoro's KPipeline runs it: G2P(british, fallback=EspeakFallback,
  * unk=''), Kokoro v1.0 phoneme set (ɾ→T, ʔ→t). Function names follow the Python
- * so the two can be read side by side. Not ported: the markdown `[word](/ipa/)`
- * preprocessing.
+ * so the two can be read side by side. misaki's markdown links are honoured:
+ * `[word](/ipa/)` sets phonemes, `[word](+1)` (or -1, 0.5, …) sets stress.
  *
  * Dictionary values are a phoneme String or a Map of POS tag → phonemes (null = none).
  * [espeak] returns espeak-ng IPA for a word (piper-phonemize style, no tie bars), or
@@ -38,6 +38,7 @@ class MisakiEnglish(
         var currency: String? = null,
         var prespace: Boolean = false,
         var rating: Int? = null,
+        var stress: Double? = null,
     )
 
     private data class Ctx(val futureVowel: Boolean? = null, val futureTo: Boolean = false)
@@ -48,13 +49,18 @@ class MisakiEnglish(
 
     /** Phonemes for [text], joined the way KPipeline.en_tokenize joins them. */
     fun phonemize(text: String): String {
-        val toks = tokenizer.tokenize(text)
-        return if (toks.isEmpty()) "" else phonemize(toks, tagger.tag(toks.map { it.text }))
+        val pre = preprocess(text)
+        val toks = tokenizer.tokenize(pre.text)
+        return if (toks.isEmpty()) "" else phonemize(toks, tagger.tag(toks.map { it.text }), pre)
     }
 
+    /** G2P.preprocess: the text without link markup, its whitespace-split words, and link features by word index. */
+    internal class Preprocessed(val text: String, val words: List<String>, val features: Map<Int, Any>)
+
     /** Tokens and POS tags supplied by the caller (tests feed spaCy's own here). */
-    internal fun phonemize(toks: List<EnglishTokenizer.Token>, tags: List<String>): String {
+    internal fun phonemize(toks: List<EnglishTokenizer.Token>, tags: List<String>, pre: Preprocessed? = null): String {
         val tokens = toks.mapIndexed { i, t -> MToken(t.text, tags[i], t.whitespace) }
+        if (pre != null && pre.features.isNotEmpty()) applyFeatures(tokens, pre)
         val words = retokenize(tokens)
         var ctx = Ctx()
         for (w in words.asReversed()) {
@@ -118,10 +124,41 @@ class MisakiEnglish(
         }.trim()
     }
 
+    /**
+     * G2P.tokenize's feature step: spaCy's Alignment maps each tokenizer token to the
+     * preprocessed word covering its characters (whitespace ignored), and the word's link
+     * feature lands on it. Phonemes go on the first token of the word, the rest get "".
+     */
+    private fun applyFeatures(tokens: List<MToken>, pre: Preprocessed) {
+        val wordAt = IntArray(pre.words.sumOf { w -> w.count { !it.isWhitespace() } })
+        var at = 0
+        for ((k, w) in pre.words.withIndex()) for (c in w) if (!c.isWhitespace()) wordAt[at++] = k
+        at = 0
+        val seen = HashMap<Int, Int>()
+        for (tk in tokens) {
+            val n = tk.text.count { !it.isWhitespace() }
+            if (n == 0 || at >= wordAt.size) continue
+            val k = wordAt[at]
+            at += n
+            val f = pre.features[k] ?: continue
+            val i = seen.merge(k, 1, Int::plus)!! - 1
+            when {
+                f is Double -> tk.stress = f
+                f is String && f.startsWith("/") -> {
+                    tk.isHead = i == 0
+                    tk.phonemes = if (i == 0) f.substring(1) else ""
+                    tk.rating = 5
+                }
+                // shortcut: "#flags#" number features are parsed but not applied; add num_flags if a voice needs them.
+            }
+        }
+    }
+
     // ---- G2P helpers -------------------------------------------------------
 
     private fun mergeTokens(tokens: List<MToken>, unk: String? = null): MToken {
         val currency = tokens.mapNotNull { it.currency }.toSet()
+        val stresses = tokens.mapNotNull { it.stress }.toSet()
         val ratings = tokens.map { it.rating }
         val phonemes = if (unk == null) null else buildString {
             for (tk in tokens) {
@@ -138,6 +175,7 @@ class MisakiEnglish(
             currency = currency.maxOrNull(),
             prespace = tokens.first().prespace,
             rating = if (null in ratings) null else ratings.filterNotNull().min(),
+            stress = stresses.singleOrNull(),
         )
     }
 
@@ -146,7 +184,7 @@ class MisakiEnglish(
         var currency: String? = null
         for ((i, token) in tokens.withIndex()) {
             val tks = if (token.alias == null && token.phonemes == null) {
-                subtokenize(token.text).map { MToken(it, token.tag, "") }
+                subtokenize(token.text).map { MToken(it, token.tag, "", stress = token.stress) }
             } else {
                 listOf(token)
             }
@@ -245,8 +283,8 @@ class MisakiEnglish(
         word = word.map { c -> if (c.isDigit() && c !in '0'..'9' && Character.getNumericValue(c) >= 0) Character.getNumericValue(c).toString() else c.toString() }.joinToString("")
         val stress = if (word == word.lowercase()) null else if (word == word.uppercase()) 2.0 else 0.5
         val r = getWord(word, tk.tag, stress, ctx)
-        if (r.ps != null) return Result(appendCurrency(r.ps, tk.currency), r.rating)
-        if (isNumber(word, tk.isHead)) return getNumber(word, tk.currency, tk.isHead)
+        if (r.ps != null) return Result(applyStress(appendCurrency(r.ps, tk.currency), tk.stress), r.rating)
+        if (isNumber(word, tk.isHead)) return getNumber(word, tk.currency, tk.isHead).let { Result(applyStress(it.ps, tk.stress), it.rating) }
         return none
     }
 
@@ -559,6 +597,41 @@ class MisakiEnglish(
         ).toRegex()
 
         private fun isDigit(s: String) = s.isNotEmpty() && s.all { it in '0'..'9' }
+
+        private val LINK = Regex("""\[([^\]]+)\]\(([^)]*)\)""")
+        private val WHITESPACE = Regex("""\s+""")
+
+        /** misaki G2P.preprocess. */
+        internal fun preprocess(text0: String): Preprocessed {
+            val text = text0.trimStart()
+            val out = StringBuilder()
+            val words = mutableListOf<String>()
+            val features = HashMap<Int, Any>()
+            var last = 0
+            for (m in LINK.findAll(text)) {
+                val before = text.substring(last, m.range.first)
+                out.append(before)
+                words += before.split(WHITESPACE).filter { it.isNotEmpty() }
+                val f = m.groupValues[2]
+                val feature: Any? = when {
+                    isDigit(if (f.startsWith("-") || f.startsWith("+")) f.substring(1) else f) -> f.toInt().toDouble()
+                    f == "0.5" || f == "+0.5" -> 0.5
+                    f == "-0.5" -> -0.5
+                    f.length > 1 && f.first() == '/' && f.last() == '/' -> "/" + f.substring(1).trimEnd('/')
+                    f.length > 1 && f.first() == '#' && f.last() == '#' -> "#" + f.substring(1).trimEnd('#')
+                    else -> null
+                }
+                if (feature != null) features[words.size] = feature
+                out.append(m.groupValues[1])
+                words += m.groupValues[1]
+                last = m.range.last + 1
+            }
+            if (last < text.length) {
+                out.append(text.substring(last))
+                words += text.substring(last).split(WHITESPACE).filter { it.isNotEmpty() }
+            }
+            return Preprocessed(out.toString(), words, features)
+        }
 
         internal fun subtokenize(word: String): List<String> = SUBTOKEN.findAll(word).map { it.value }.toList()
 

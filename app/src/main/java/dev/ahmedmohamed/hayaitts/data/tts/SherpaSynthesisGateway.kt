@@ -20,7 +20,7 @@ class SherpaSynthesisGateway(
 
     override suspend fun synthesize(request: SynthesizeUseCase.Request): SynthesizeUseCase.Output =
         withContext(dispatchers.default) {
-            val out = runtime.synthesize(
+            val out = runtime.synthesizeMarkup(
                 voiceId = request.voiceId,
                 text = request.text,
                 sid = request.sid,

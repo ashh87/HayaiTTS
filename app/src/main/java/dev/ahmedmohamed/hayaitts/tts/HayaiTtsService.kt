@@ -239,9 +239,9 @@ class HayaiTtsService : TextToSpeechService() {
             return
         }
 
-        // Each sentence is played as soon as it is generated; returning 0 stops sherpa early.
+        // Markup (docs/MARKUP.md) is honoured; each sentence plays as soon as it is generated and a 0 return stops early.
         try {
-            runtime.synthesizeStreaming(
+            runtime.synthesizeMarkup(
                 voiceId = voice.voiceId,
                 text = text,
                 sid = sid,
