@@ -4,11 +4,12 @@ import android.content.Context
 import java.io.File
 
 /**
- * Loads misaki's data from assets/g2p once per process (~1 s on a desktop JVM, ~75 MB
- * of heap), only when a Kokoro English voice is first used.
+ * misaki's data from assets/g2p, opened once per process. The dictionaries and
+ * tagger weights are memory-mapped [PackedTable]s (no heap, no parsing); only
+ * the tokenizer's regexes are compiled at load.
  */
 object MisakiAssets {
-    private class Accent(val golds: Map<String, Any>, val silvers: Map<String, Any>)
+    private class Accent(val golds: PackedTable, val silvers: PackedTable)
 
     private var tokenizer: EnglishTokenizer? = null
     private var tagger: PosTagger? = null
@@ -16,16 +17,7 @@ object MisakiAssets {
 
     @Synchronized
     fun english(context: Context, british: Boolean, customWords: File, espeak: (String) -> String?): MisakiEnglish {
-        fun dictionary(name: String) = context.assets.open("g2p/$name").bufferedReader().use { MisakiEnglish.loadDictionary(it.lineSequence()) }
-        val tok = tokenizer ?: EnglishTokenizer(context.assets.open("g2p/en_tokenizer.json").bufferedReader().readText()).also { tokenizer = it }
-        val tag = tagger ?: context.assets.open("g2p/pos_tagger.txt").bufferedReader().use { PosTagger(it.lineSequence()) }.also { tagger = it }
-        val prefix = if (british) "gb" else "us"
-        val accent = accents.getOrPut(british) {
-            Accent(
-                dictionary("${prefix}_gold.tsv"),
-                dictionary("${prefix}_silver.tsv"),
-            )
-        }
+        val (tok, tag, accent) = shared(context, british)
         return MisakiEnglish(
             british,
             MisakiEnglish.Dict(accent.golds, loadCustomWords(customWords)),
@@ -34,6 +26,26 @@ object MisakiAssets {
             tag,
             espeak,
         )
+    }
+
+    /** Opens everything and pages it in, so the first sentence does not wait on it. */
+    @Synchronized
+    fun preload(context: Context, british: Boolean) {
+        val (_, _, accent) = shared(context, british)
+        accent.golds.preload()
+        accent.silvers.preload()
+        tagTable?.preload()
+    }
+
+    private var tagTable: PackedTable? = null
+
+    private fun shared(context: Context, british: Boolean): Triple<EnglishTokenizer, PosTagger, Accent> {
+        fun table(name: String) = PackedTable.asset(context, "g2p/$name.kv")
+        val tok = tokenizer ?: EnglishTokenizer(context.assets.open("g2p/en_tokenizer.json").bufferedReader().use { it.readText() }).also { tokenizer = it }
+        val tag = tagger ?: PosTagger(table("pos_tagger").also { tagTable = it }).also { tagger = it }
+        val prefix = if (british) "gb" else "us"
+        val accent = accents.getOrPut(british) { Accent(table("${prefix}_gold"), table("${prefix}_silver")) }
+        return Triple(tok, tag, accent)
     }
 
     /** Like the desktop add_custom_words(): golds[word] = golds[word.lower()] = phonemes. */

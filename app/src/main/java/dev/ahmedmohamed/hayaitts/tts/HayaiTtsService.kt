@@ -44,8 +44,15 @@ class HayaiTtsService : TextToSpeechService() {
         }
     }
 
-    override fun onLoadLanguage(lang: String?, country: String?, variant: String?): Int =
-        onIsLanguageAvailable(lang, country, variant)
+    // The framework calls this when a client connects (default locale) and on setLanguage,
+    // usually well before the first speak(): warm the phonemizer then.
+    override fun onLoadLanguage(lang: String?, country: String?, variant: String?): Int {
+        val result = onIsLanguageAvailable(lang, country, variant)
+        if (result >= TextToSpeech.LANG_AVAILABLE) {
+            runtimeOrNull()?.let { rt -> rt.preloadFrontends(rt.listAvailableVoices().filter { it.matchesLanguage(lang) }) }
+        }
+        return result
+    }
 
     override fun onGetLanguage(): Array<String> {
         // The framework expects ISO-639 alpha-3 + ISO-3166 alpha-3 + variant.
@@ -84,8 +91,9 @@ class HayaiTtsService : TextToSpeechService() {
         if (resolveVoiceName(name) != null) TextToSpeech.SUCCESS else TextToSpeech.ERROR
 
     override fun onLoadVoice(name: String?): Int {
-        if (resolveVoiceName(name) == null) return TextToSpeech.ERROR
+        val voice = resolveVoiceName(name) ?: return TextToSpeech.ERROR
         lastSelectedVoiceId = name!!
+        runtimeOrNull()?.preloadFrontends(listOf(voice))
         return TextToSpeech.SUCCESS
     }
 

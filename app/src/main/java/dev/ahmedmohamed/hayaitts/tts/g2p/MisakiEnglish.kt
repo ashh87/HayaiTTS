@@ -23,9 +23,9 @@ class MisakiEnglish(
 ) {
 
     /** Lookup over misaki's dictionary plus per-voice overrides (custom words win). */
-    class Dict(private val base: Map<String, Any>, private val overrides: Map<String, Any> = emptyMap()) {
-        operator fun get(k: String): Any? = overrides[k] ?: base[k]
-        operator fun contains(k: String): Boolean = k in overrides || k in base
+    class Dict(private val base: PackedTable?, private val overrides: Map<String, Any> = emptyMap()) {
+        operator fun get(k: String): Any? = overrides[k] ?: base?.string(k)?.let(::parseValue)
+        operator fun contains(k: String): Boolean = k in overrides || (base != null && k in base)
     }
 
     class MToken(
@@ -690,36 +690,8 @@ class MisakiEnglish(
             return out.firstOrNull() ?: ""
         }
 
-        /** misaki Lexicon.grow_dictionary: add Capitalised / lowercase variants. */
-        fun growDictionary(d: Map<String, Any>): HashMap<String, Any> {
-            val e = HashMap<String, Any>(d.size * 2)
-            for ((k, v) in d) {
-                if (k.length < 2) continue
-                val cap = k.lowercase().replaceFirstChar { it.titlecase() }
-                if (k == k.lowercase()) {
-                    if (k != cap) e[cap] = v
-                } else if (k == cap) {
-                    e[k.lowercase()] = v
-                }
-            }
-            e.putAll(d)
-            return e
-        }
-
-        /** The assets/g2p tsv files: "word<TAB>phonemes" or "word<TAB>TAG=ps|TAG=ps" (empty = null). */
-        fun loadDictionary(lines: Sequence<String>): Map<String, Any> {
-            val d = HashMap<String, Any>(1 shl 18)
-            for (line in lines) {
-                val tab = line.indexOf('\t')
-                if (tab < 0) continue
-                val v = line.substring(tab + 1)
-                d[line.substring(0, tab)] = if ('=' in v) {
-                    v.split('|').associate { kv -> kv.substringBefore('=') to kv.substringAfter('=').ifEmpty { null } }
-                } else {
-                    v
-                }
-            }
-            return growDictionary(d)
-        }
+        /** A packed dictionary value: "phonemes" or "TAG=ps|TAG=ps" (empty ps = none); grown at build time. */
+        fun parseValue(v: String): Any =
+            if ('=' in v) v.split('|').associate { kv -> kv.substringBefore('=') to kv.substringAfter('=').ifEmpty { null } } else v
     }
 }

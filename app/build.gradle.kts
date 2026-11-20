@@ -152,6 +152,8 @@ android {
     // inflating ~28 MB into RAM on every cold start.
     androidResources {
         noCompress += "onnx"
+        // misaki tables are memory-mapped straight out of the APK (PackedTable.asset).
+        noCompress += "kv"
     }
 }
 

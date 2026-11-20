@@ -38,7 +38,6 @@ import dev.ahmedmohamed.hayaitts.ui.library.LibraryScreen
 import dev.ahmedmohamed.hayaitts.ui.onboarding.OnboardingScreen
 import dev.ahmedmohamed.hayaitts.ui.settings.SettingsScreen
 import dev.ahmedmohamed.hayaitts.ui.studio.StudioScreen
-import java.net.URLEncoder
 
 /**
  * Top-level navigation: a [NavigationBar] hosts five top-level destinations
@@ -216,8 +215,9 @@ object Routes {
 
     /**
      * Picked SAF URIs are URL-encoded so the `content://...` literal doesn't
-     * collide with route path parsing. The destination VM decodes once.
+     * collide with route path parsing. Navigation decodes it (Uri.decode) before
+     * the destination sees it, so encode with the matching Uri.encode.
      */
     fun customImport(rawUri: String): String =
-        "customImport/${URLEncoder.encode(rawUri, "UTF-8")}"
+        "customImport/${android.net.Uri.encode(rawUri)}"
 }

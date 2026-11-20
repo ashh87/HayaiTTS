@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.URLDecoder
 
 /**
  * Drives the multi-step custom voice import wizard. The screen subscribes to
@@ -31,7 +30,9 @@ class CustomImportViewModel(
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
-    private val uri: Uri = URLDecoder.decode(encodedUri, "UTF-8").toUri()
+    // Navigation has already decoded the route argument once. Decoding again turns a
+    // picked "document/msf%3A123" into "msf:123", which has no read grant.
+    private val uri: Uri = encodedUri.toUri()
 
     enum class FamilyChoice(val family: ModelFamily, val supported: Boolean) {
         PIPER(ModelFamily.PIPER, true),

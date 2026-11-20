@@ -24,7 +24,7 @@ class MisakiEnglishTest {
         val voice = if (british) "en" else "en-us"
         val raw = resource("espeak.tsv").readLines().map { it.split('\t') }.filter { it[0] == voice }.associate { it[1] to it[2] }
         val accent = if (british) "gb" else "us"
-        fun dict(name: String) = MisakiEnglish.loadDictionary(File(ASSETS, "${accent}_$name.tsv").bufferedReader().lineSequence())
+        fun dict(name: String) = PackedTable.file(File(ASSETS, "${accent}_$name.kv"))
         return MisakiEnglish(
             british,
             MisakiEnglish.Dict(dict("gold")),
@@ -71,8 +71,8 @@ class MisakiEnglishTest {
     fun `custom words override the dictionary`() {
         val g = MisakiEnglish(
             true,
-            MisakiEnglish.Dict(MisakiEnglish.loadDictionary(File(ASSETS, "gb_gold.tsv").bufferedReader().lineSequence()), mapOf("niamh" to "nˈiːv", "Niamh" to "nˈiːv")),
-            MisakiEnglish.Dict(emptyMap()),
+            MisakiEnglish.Dict(PackedTable.file(File(ASSETS, "gb_gold.kv")), mapOf("niamh" to "nˈiːv", "Niamh" to "nˈiːv")),
+            MisakiEnglish.Dict(null),
             tokenizer,
             tagger,
         ) { null }
@@ -103,6 +103,6 @@ class MisakiEnglishTest {
     private companion object {
         val ASSETS = File("src/main/assets/g2p")
         val tokenizer by lazy { EnglishTokenizer(File(ASSETS, "en_tokenizer.json").readText()) }
-        val tagger by lazy { PosTagger(File(ASSETS, "pos_tagger.txt").bufferedReader().lineSequence()) }
+        val tagger by lazy { PosTagger(PackedTable.file(File(ASSETS, "pos_tagger.kv"))) }
     }
 }

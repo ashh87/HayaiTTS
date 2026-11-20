@@ -6,26 +6,9 @@ package dev.ahmedmohamed.hayaitts.tts.g2p
  * Trained on spaCy's own tags by tools/g2p/train_tagger.py (~96% agreement);
  * the feature code here mirrors that script exactly.
  */
-class PosTagger(lines: Sequence<String>) {
+class PosTagger(private val table: PackedTable) {
 
-    private var classes = emptyArray<String>()
-    private val tagdict = HashMap<String, String>()
-    private val weights = HashMap<String, Pair<IntArray, DoubleArray>>(1 shl 17)
-
-    init {
-        for (line in lines) {
-            val f = line.split('\t')
-            when (f[0]) {
-                "C" -> classes = f.drop(1).toTypedArray()
-                "T" -> tagdict[f[1]] = f[2]
-                "W" -> {
-                    val pairs = f[2].split(' ')
-                    weights[f[1]] = IntArray(pairs.size) { pairs[it].substringBefore(':').toInt() } to
-                        DoubleArray(pairs.size) { pairs[it].substringAfter(':').toDouble() }
-                }
-            }
-        }
-    }
+    private val classes = table.string("\tC")!!.split('\t').toTypedArray()
 
     fun tag(words: List<String>): List<String> {
         val ctx = listOf("-S-", "-S2-") + words.map(::norm) + listOf("-E-", "-E2-")
@@ -33,11 +16,12 @@ class PosTagger(lines: Sequence<String>) {
         var prev2 = "-S2-"
         val scores = DoubleArray(classes.size)
         return words.indices.map { i ->
-            val t = tagdict[words[i]] ?: run {
+            val t = table.string("\tT\t" + words[i]) ?: run {
                 scores.fill(0.0)
                 for (feat in features(i, words, ctx, prev, prev2)) {
-                    val (cs, ws) = weights[feat] ?: continue
-                    for (k in cs.indices) scores[cs[k]] += ws[k]
+                    val ws = table[feat] ?: continue
+                    // (u8 class index, f32 weight) pairs
+                    for (k in 0 until ws.remaining() / 5) scores[ws.get(5 * k).toInt() and 0xFF] += ws.getFloat(5 * k + 1).toDouble()
                 }
                 // Python: max(classes, key=(score, name))
                 classes.indices.maxWith(compareBy<Int>({ scores[it] }, { classes[it] })).let { classes[it] }

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
 import java.io.File
+import kotlin.concurrent.thread
 
 /**
  * Multi-voice wrapper around sherpa-onnx [OfflineTts]. The runtime holds an
@@ -291,6 +292,27 @@ class SherpaTtsRuntime private constructor(
             }
     }
 
+    /**
+     * Opens misaki's tables for these voices' accents on a background thread, so a
+     * Kokoro English voice's first sentence does not wait on them.
+     */
+    fun preloadFrontends(voices: List<InstalledVoice>) {
+        val accents = voices
+            .filter { runCatching { runtimeFamily(it) }.getOrNull() == ModelFamily.KOKORO }
+            .mapNotNull(::britishAccent)
+            .toSet()
+        if (accents.isEmpty()) return
+        thread(name = "misaki-preload", isDaemon = true) {
+            for (british in accents) {
+                runCatching { MisakiAssets.preload(context, british) }.onFailure { log.w(it) { "misaki preload failed" } }
+            }
+        }
+    }
+
+    /** null when the voice has no English; otherwise whether its English is en-GB. */
+    private fun britishAccent(voice: InstalledVoice): Boolean? =
+        voice.languages.firstOrNull { it.languageHead() == "en" }?.replace('_', '-')?.equals("en-GB", ignoreCase = true)
+
     private fun engine(
         voiceId: String,
         lengthScale: Float,
@@ -395,8 +417,7 @@ class SherpaTtsRuntime private constructor(
         fun espeak(espeakVoice: String) = PhonemeFrontend { text ->
             Espeak.phonemize(context, text, espeakVoice).map { it.codePoints().toArray() }.toTypedArray()
         }
-        val english = voice.languages.firstOrNull { it.languageHead() == "en" }
-        val british = english?.replace('_', '-')?.equals("en-GB", ignoreCase = true) == true
+        val british = britishAccent(voice) == true
         return when (family) {
             ModelFamily.PIPER, ModelFamily.VITS, ModelFamily.MATCHA, ModelFamily.KITTEN ->
                 espeak(tts.lang().ifBlank { if (british) "en" else "en-us" })
