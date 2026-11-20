@@ -54,6 +54,20 @@ class HayaiTtsService : TextToSpeechService() {
         return result
     }
 
+    /**
+     * The framework's TextToSpeech.setLanguage() fails unless this names a voice. The
+     * default implementation offers the locale tag ("en-GB"), which is not one of ours.
+     * Prefers the voice last loaded, then an exact locale match, then same language.
+     */
+    override fun onGetDefaultVoiceNameFor(lang: String?, country: String?, variant: String?): String? {
+        val voices = runtimeOrNull()?.listAvailableVoices().orEmpty()
+        val requested = buildBcp47(lang, country, variant)
+        val (lastId, _) = parseVoiceName(lastSelectedVoiceId)
+        voices.firstOrNull { it.voiceId == lastId && it.matchesLanguage(lang) }?.let { return lastSelectedVoiceId }
+        // A bare voiceId is valid (onIsValidVoiceName); multi-speaker voices then use the default speaker.
+        return (voices.firstOrNull { it.matchesLocale(requested) } ?: voices.firstOrNull { it.matchesLanguage(lang) })?.voiceId
+    }
+
     override fun onGetLanguage(): Array<String> {
         // The framework expects ISO-639 alpha-3 + ISO-3166 alpha-3 + variant.
         // For the currently selected voice, derive these from its first
@@ -254,7 +268,7 @@ class HayaiTtsService : TextToSpeechService() {
 
     private fun InstalledVoice.matchesLanguage(lang: String?): Boolean {
         if (lang.isNullOrEmpty()) return false
-        val target = parseLocale(lang).language
+        val target = parseLocale(frameworkLocaleTag(lang, null)).language
         if (target.isEmpty()) return false
         return languages.any { parseLocale(it).language.equals(target, ignoreCase = true) }
     }
@@ -265,29 +279,7 @@ class HayaiTtsService : TextToSpeechService() {
      * ISO-3166 alpha-3 for country; we convert via [Locale] so the comparison
      * with the catalog's BCP-47 tags (alpha-2) works.
      */
-    private fun buildBcp47(lang: String?, country: String?, variant: String?): String {
-        if (lang.isNullOrEmpty()) return ""
-        // Locale(String) does not accept ISO-639 alpha-3 reliably; build via Builder.
-        val locale = runCatching {
-            val builder = Locale.Builder()
-            // Try alpha-2 first; if the input is alpha-3, Locale.forLanguageTag handles it.
-            val candidate = Locale.forLanguageTag(lang)
-            if (candidate.language.isEmpty()) {
-                builder.setLanguage(lang.lowercase()).build()
-            } else {
-                candidate
-            }
-        }.getOrNull() ?: return ""
-        val final = if (!country.isNullOrEmpty()) {
-            runCatching {
-                Locale.Builder()
-                    .setLanguage(locale.language)
-                    .setRegion(country)
-                    .build()
-            }.getOrDefault(locale)
-        } else locale
-        return final.toLanguageTag()
-    }
+    private fun buildBcp47(lang: String?, country: String?, variant: String?): String = frameworkLocaleTag(lang, country)
 
     /**
      * Convert sherpa-onnx's float samples (-1..1) to little-endian 16-bit PCM
@@ -325,4 +317,24 @@ class HayaiTtsService : TextToSpeechService() {
         const val BYTES_PER_SAMPLE = 2
         const val MAX_TEXT_LENGTH = 2000
     }
+}
+
+/**
+ * BCP-47 tag for the framework's locale parts. TextToSpeech sends ISO-639-2 / ISO-3166
+ * alpha-3 codes ("eng", "GBR"); voices are tagged with the two-letter forms ("en-GB").
+ */
+internal fun frameworkLocaleTag(lang: String?, country: String?): String {
+    if (lang.isNullOrBlank()) return ""
+    val l = lang.trim().replace('_', '-').substringBefore('-').lowercase().let { ISO3_LANGUAGES[it] ?: it }
+    val c = country?.trim()?.uppercase()?.let { ISO3_COUNTRIES[it] ?: it }.orEmpty()
+    return runCatching { Locale.Builder().setLanguage(l).setRegion(c).build().toLanguageTag() }
+        .getOrElse { runCatching { Locale.Builder().setLanguage(l).build().toLanguageTag() }.getOrDefault("") }
+}
+
+private val ISO3_LANGUAGES: Map<String, String> by lazy {
+    Locale.getISOLanguages().mapNotNull { runCatching { Locale(it).isO3Language to it }.getOrNull() }.toMap()
+}
+
+private val ISO3_COUNTRIES: Map<String, String> by lazy {
+    Locale.getISOCountries().mapNotNull { runCatching { Locale("", it).isO3Country to it }.getOrNull() }.toMap()
 }
