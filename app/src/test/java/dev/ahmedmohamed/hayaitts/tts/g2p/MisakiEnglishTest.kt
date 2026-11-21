@@ -71,7 +71,7 @@ class MisakiEnglishTest {
     fun `custom words override the dictionary in any case`() {
         val tsv = File.createTempFile("pronunciations", ".tsv").apply {
             deleteOnExit()
-            writeText("# comment\nniamh\tnˈiːv\nnormalé  nˌɔːmˈɑɑlˈɛː\n")
+            writeText("# comment\nniamh\tnˈiːv\nnormalé  nˌɔːmˈɑɑlˈɛː\nPOI\tpˌiːˌQˈI\nGPS\tʤˌiːpiːˈɛs\n")
         }
         val g = MisakiEnglish(
             true,
@@ -82,6 +82,14 @@ class MisakiEnglishTest {
         ) { null }
         assertEquals("həlˈQ nˈiːv.", g.phonemize("Hello Niamh."))
         assertEquals("nˌɔːmˈɑɑlˈɛː, nˌɔːmˈɑɑlˈɛː.", g.phonemize("Normalé, normalé."))
+        // acronyms in capitals only (expected strings from the kokoro tools' lexicon.add_custom_words)
+        assertEquals("pˌiːˌQˈI əhˈɛd.", g.phonemize("POI ahead."))
+        assertEquals("tˈuː pˌiːˌQˈIz nˌɪəbˈI.", g.phonemize("Two POIs nearby."))
+        assertEquals("ˈiːt sˌʌm pˈY.", g.phonemize("Eat some poi."))
+        // the s matters: GPs (doctors) isn't GPS, and GPSs is GPS plus a plural
+        assertEquals("tˈuː ʤˌiːpˈiːz.", g.phonemize("Two GPs."))
+        assertEquals("ðə ʤˌiːpiːˈɛs.", g.phonemize("The GPS."))
+        assertEquals("tˈuː ʤˌiːpiːˈɛsɪz.", g.phonemize("Two GPSs."))
     }
 
     @Test

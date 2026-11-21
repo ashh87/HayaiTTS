@@ -57,7 +57,8 @@ object MisakiAssets {
 
     /**
      * Like the desktop add_custom_words(): word, lowercase and Capitalised forms all map to
-     * the phonemes (misaki only grows its own dictionaries that way, at load time).
+     * the phonemes (misaki only grows its own dictionaries that way, at load time). A word in
+     * capitals (POI) is an acronym: capitals only, so "poi" stays a word; plurals (POIs) come from misaki's -s.
      */
     internal fun loadCustomWords(file: File): Map<String, Any> {
         if (!file.isFile) return emptyMap()
@@ -65,10 +66,13 @@ object MisakiAssets {
         file.forEachLine { raw ->
             val parts = raw.substringBefore('#').trim().split(Regex("\\s+"))
             if (parts.size == 2) {
-                val lower = parts[0].lowercase()
-                out[parts[0]] = parts[1]
-                out[lower] = parts[1]
-                out[lower.replaceFirstChar { it.titlecase() }] = parts[1]
+                val w = parts[0]
+                out[w] = parts[1]
+                if (w.length < 2 || w != w.uppercase() || w == w.lowercase()) {
+                    val lower = w.lowercase()
+                    out[lower] = parts[1]
+                    out[lower.replaceFirstChar { it.titlecase() }] = parts[1]
+                }
             }
         }
         return out
