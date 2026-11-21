@@ -631,10 +631,13 @@ class MisakiEnglish(
         private val YEAR_BEFORE = setOf(
             "in", "since", "from", "until", "till", "by", "before", "after", "during", "circa", "c.", "of",
             "year", "born", "died", "founded", "built", "established", "est.", "copyright", "©", "vintage",
-            "summer", "winter", "spring", "autumn", "fall", "between",
-            "january", "february", "march", "april", "may", "june", "july", "august", "september",
-            "october", "november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep",
-            "sept", "oct", "nov", "dec",
+            "summer", "winter", "spring", "autumn", "fall", "between", "early", "late", "mid",
+        )
+        // a date (or a statute: Census Act 1920): wins over everything after (17 October 1883 of ...)
+        private val MONTHS = setOf(
+            "january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+            "november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov",
+            "dec", "day", "act",
         )
         private val IDENT_BEFORE = setOf("flight", "room", "bus", "route", "platform", "gate", "train", "model", "no.", "number")
         private val NUMBER_BEFORE = setOf("cost", "costs", "paid", "pay", "weighs", "scored", "total", "than", "sold", "earned", "raised")
@@ -642,39 +645,49 @@ class MisakiEnglish(
         private val ABOUT_BEFORE = setOf(
             "about", "around", "approximately", "roughly", "nearly", "almost", "over", "under", "exactly", "only", "just", "some",
         )
-        private val YEAR_AFTER = setOf("ad", "bc", "bce", "ce")
+        private val YEAR_AFTER = setOf("ad", "bc", "bce", "ce", "onwards", "onward")
         private val YEAR_VERBS = setOf("was", "is", "will", "has", "had", "saw", "brought", "marked", "began", "ended")
         private val RANGE = setOf("to", "and", "or", "-", "–")
         private val UNITS = setOf( // a count
             "m", "metre", "metres", "meter", "meters", "km", "kilometre", "kilometres", "kilometer", "kilometers",
             "mi", "mile", "miles", "yd", "yard", "yards", "ft", "foot", "feet", "kg", "g", "mph", "kph", "%",
-            "percent", "per", "pounds", "quid", "euros", "dollars", "pence", "of", "times", "years", "months",
-            "weeks", "days", "hours", "minutes", "seconds", "calories", "words", "pages", "votes", "points",
+            "percent", "per", "pounds", "quid", "euros", "dollars", "pence", "times", "years", "months",
+            "weeks", "days", "hours", "minutes", "seconds", "calories", "words", "pages", "votes", "points", "hz",
+            "khz", "mhz", "ghz", "kw", "mw", "cc", "ml", "litres", "liters", "tonnes", "tons", "acres", "hectares",
         )
         private val PLURALS = setOf("people", "children", "men", "women", "staff", "sheep", "fish", "data", "police", "cattle", "teeth", "mice")
-        private val TIME_BEFORE = setOf("in", "by", "since", "from", "until", "till", "before", "after", "during", "between")
+        private val TIME_BEFORE = setOf("in", "at", "by", "since", "from", "until", "till", "before", "after", "during", "between", "the")
+        private val STRONG_TIME_BEFORE = setOf("by", "since", "until", "till", "before", "after", "during") // by 1674 thousands remained
         private val YEARLIKE = 1800..2099 // with no other cue these read as years ("1990"), others in full ("1250")
+        private val NO_TOUCH = setOf("isbn", "issn") // digit strings, left to misaki
         private const val NUM = "[1-9]\\d{3}(?![\\w.,:]?\\w)"
         private val FOUR_DIGITS = Regex("(?<![\\w£$€¥.,:])($NUM)")
         private val RANGE_NEXT = Regex("^\\s*(?:to|and|or|-|–)\\s*$NUM")
-        private val TIGHT_RANGE = Regex("^[-–]$NUM")
+        private val TIGHT_RANGE = Regex("^[-–](\\d{2}\\b|$NUM)")
         private val LAST_WORD = Regex("(\\S+)\\s*$")
         private val WORD_BEFORE_LAST = Regex("(\\S+)\\s+\\S+\\s*$")
-        private val CLAUSE_END = Regex("^\\s*([.,;:!?]|$)")
+        private val TOKEN_HEAD = Regex("\\S*$")
+        private val TOKEN_TAIL = Regex("^\\S*")
+        private val MID = Regex("mid-$", RegexOption.IGNORE_CASE)
+        private val FIRST_WORD = Regex("^\\s*([^\\s.,;:!?)]+|[.,;:!?)])")
+        private val CLAUSE_END = Regex("^\\s*([.,;:!?)]|$)")
+        private val LIST_GAP = Regex("[,\\s]*(and\\s+|or\\s+)?")
         private val SPACES = Regex("\\s+")
-        private val FIRST_WORD = Regex("^\\s*([^\\s.,;:!?]+|[.,;:!?])")
 
-        /** A plural noun, by its spelling. */
-        private fun plural(w: String) = w in PLURALS ||
-            (w.all { it.isLetter() } && w == w.lowercase() && w.length > 3 && w.endsWith("s") &&
+        /** A plural noun, by its spelling ([w] as written: "James" is a name). */
+        private fun plural(w: String) = w.lowercase() in PLURALS ||
+            (w.isNotEmpty() && w.all { it.isLetter() } && w == w.lowercase() && w.length > 3 && w.endsWith("s") &&
                 !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
 
+        private fun possessive(w: String) = w.endsWith("'s") || w.endsWith("’s")
+
         /**
-         * After "in 1990 cases": a count if the phrase ends there or goes on as one ("out of 2000", "per year"),
-         * a year if the sentence goes on ("in 1990 cases of measles peaked").
+         * After "in 1990 cases": a count if it goes on as one ("out of 2000", "per year"), or for a number that
+         * doesn't look like a year, if the phrase ends there ("in 1250 ways."). Else a year: "in 1990 cases of
+         * measles peaked", "by 1674 thousands remained", "the 2015 earthquakes.".
          */
-        private fun countAfterNoun(rest: String): Boolean {
-            if (CLAUSE_END.containsMatchIn(rest)) return true
+        private fun counted(rest: String, n: Int): Boolean {
+            if (CLAUSE_END.containsMatchIn(rest)) return n !in YEARLIKE
             val ws = rest.lowercase().trim().split(SPACES)
             val w = ws[0]
             val w2 = ws.getOrElse(1) { "" }
@@ -687,34 +700,53 @@ class MisakiEnglish(
          * around each number; same as kokoro-tools expressive.british_numbers (cases: number_cases.json).
          */
         internal fun britishNumbers(text: String): String {
+            val out = StringBuilder()
+            var last = 0
             var year = false
-            return FOUR_DIGITS.replace(text) { m ->
+            var lastYearEnd = -1
+            for (m in FOUR_DIGITS.findAll(text)) {
                 val head = text.substring(0, m.range.first)
-                var prev = LAST_WORD.find(head)?.groupValues?.get(1)?.trim('(', '"', '\'') ?: ""
-                if (head.trimEnd().endsWith("-") || head.trimEnd().endsWith("–")) prev = "-"
                 var rest = text.substring(m.range.last + 1)
-                RANGE_NEXT.find(rest)?.let { rest = rest.substring(it.range.last + 1) }
+                val token = TOKEN_HEAD.find(head)!!.value + m.value + TOKEN_TAIL.find(rest)!!.value
+                var prev = LAST_WORD.find(head)?.groupValues?.get(1)?.trim('(', '"', '\'') ?: ""
+                val pv2 = WORD_BEFORE_LAST.find(head)?.groupValues?.get(1)?.lowercase() ?: ""
+                if (token.count { it == '-' || it == '–' } > 1 || prev.lowercase() in NO_TOUCH || pv2 in NO_TOUCH) {
+                    continue // ISBN 978-0-7524-9485-2: left as it is
+                }
+                if (MID.containsMatchIn(head)) prev = "mid" // mid-1066
+                else if (head.trimEnd().endsWith("-") || head.trimEnd().endsWith("–")) prev = "-" // 1990-2010
+                RANGE_NEXT.find(rest)?.let { rest = rest.substring(it.range.last + 1) } // 1990 to 2000: the cue is after the range
                 val after = FIRST_WORD.find(rest)?.groupValues?.get(1) ?: ""
+                val after2 = rest.trim().split(SPACES).getOrElse(1) { "" }
                 val n = m.value.toInt()
                 val nxt = after.lowercase()
                 val pv = prev.lowercase()
-                val pv2 = WORD_BEFORE_LAST.find(head)?.groupValues?.get(1)?.lowercase() ?: ""
                 val start = prev.isEmpty() || prev.last() in ".!?"
+                // flight 4418; Fire of London 1666, CP 4418 (a capitalised word, not the sentence's first)
+                val ident = pv in IDENT_BEFORE || (prev.firstOrNull()?.isUpperCase() == true && prev.all { it.isLetter() } &&
+                    pv2.isNotEmpty() && pv2.last() !in ".!?")
+                val listed = year && lastYearEnd >= 0 && LIST_GAP.matches(text.substring(lastYearEnd, m.range.first)) // 1051, 1052, and 1065
                 year = when {
-                    nxt in YEAR_AFTER -> true
-                    n >= 2100 || nxt in UNITS || pv in NUMBER_BEFORE || (pv == "of" && pv2 == "out") ||
-                        (pv in ABOUT_BEFORE && (n !in YEARLIKE || plural(nxt))) -> false
+                    nxt in YEAR_AFTER || pv in MONTHS -> true
+                    head.endsWith("(") && rest.startsWith(")") -> true // (1693)
+                    (n >= 2100 && !ident) || (nxt in UNITS && after2.firstOrNull()?.isDigit() != true) || pv in NUMBER_BEFORE ||
+                        (pv == "of" && pv2 == "out") || (nxt == "of" && !(pv in YEAR_BEFORE && n in YEARLIKE)) ||
+                        (pv in ABOUT_BEFORE && (n !in YEARLIKE || plural(after))) -> false
                     // in 1990 cases (of measles peaked | out of 2000); the 1990 figures showed
-                    plural(nxt) -> (pv in TIME_BEFORE || pv == "the" || (year && pv in RANGE)) && n in YEARLIKE &&
-                        !countAfterNoun(rest.trimStart().substring(after.length))
-                    pv in YEAR_BEFORE || pv in IDENT_BEFORE || (year && pv in RANGE) ||
-                        TIGHT_RANGE.containsMatchIn(text.substring(m.range.last + 1)) -> true
+                    plural(after) -> (pv in TIME_BEFORE || possessive(pv) || (year && pv in RANGE)) &&
+                        !counted(rest.trimStart().substring(after.length), n) && (n in YEARLIKE || pv in STRONG_TIME_BEFORE)
+                    listed || ident || pv in YEAR_BEFORE || (year && pv in RANGE) ||
+                        TIGHT_RANGE.containsMatchIn(text.substring(m.range.last + 1)) -> true // 1990-2010, 1107–37
                     after.firstOrNull()?.isUpperCase() == true && !start -> true // the 1990 World Cup
-                    pv == "the" && after.isNotEmpty() && after.all { it.isLetter() } && after == after.lowercase() -> true
+                    (pv == "the" || possessive(pv)) && after.isNotEmpty() && after.all { it.isLetter() } &&
+                        after == after.lowercase() -> true // the 2010 election
                     else -> n in YEARLIKE || (start && nxt in YEAR_VERBS) // 1990; 1250 was a bad year
                 }
-                if (year) m.value else m.value[0] + "," + m.value.substring(1)
+                if (year) lastYearEnd = m.range.last + 1
+                out.append(text, last, m.range.first).append(if (year) m.value else m.value[0] + "," + m.value.substring(1))
+                last = m.range.last + 1
             }
+            return out.append(text, last, text.length).toString()
         }
 
         // count of commas before each, by ear (3 for love, 2 for mate)
