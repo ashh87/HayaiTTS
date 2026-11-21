@@ -652,11 +652,14 @@ class MisakiEnglish(
             "m", "metre", "metres", "meter", "meters", "km", "kilometre", "kilometres", "kilometer", "kilometers",
             "mi", "mile", "miles", "yd", "yard", "yards", "ft", "foot", "feet", "kg", "g", "mph", "kph", "%",
             "percent", "per", "pounds", "quid", "euros", "dollars", "pence", "times", "years", "months",
-            "weeks", "days", "hours", "minutes", "seconds", "calories", "words", "pages", "votes", "points", "hz",
+            "weeks", "days", "hours", "minutes", "seconds", "hz",
             "khz", "mhz", "ghz", "kw", "mw", "cc", "ml", "litres", "liters", "tonnes", "tons", "acres", "hectares",
         )
         private val PLURALS = setOf("people", "children", "men", "women", "staff", "sheep", "fish", "data", "police", "cattle", "teeth", "mice")
-        private val TIME_BEFORE = setOf("in", "at", "by", "since", "from", "until", "till", "before", "after", "during", "between", "the")
+        private val TIME_BEFORE = setOf( // their 2023 reviews
+            "in", "at", "by", "since", "from", "until", "till", "before", "after", "during", "between", "the",
+            "their", "his", "her", "its", "our", "my", "your", "this", "that", "last", "next",
+        )
         private val STRONG_TIME_BEFORE = setOf("by", "since", "until", "till", "before", "after", "during") // by 1674 thousands remained
         private val YEARLIKE = 1800..2099 // with no other cue these read as years ("1990"), others in full ("1250")
         private val NO_TOUCH = setOf("isbn", "issn") // digit strings, left to misaki
@@ -672,6 +675,8 @@ class MisakiEnglish(
         private val FIRST_WORD = Regex("^\\s*([^\\s.,;:!?)]+|[.,;:!?)])")
         private val CLAUSE_END = Regex("^\\s*([.,;:!?)]|$)")
         private val LIST_GAP = Regex("[,\\s]*(and\\s+|or\\s+)?")
+        private val RANGE_GAP = Regex("\\s*(and|to|or|-|–)\\s*")
+        private val RANGE_END = Regex("\\d{4}\\s*[-–]\\s*$")
         private val SPACES = Regex("\\s+")
 
         /** A plural noun, by its spelling ([w] as written: "James" is a name). */
@@ -691,7 +696,7 @@ class MisakiEnglish(
             val ws = rest.lowercase().trim().split(SPACES)
             val w = ws[0]
             val w2 = ws.getOrElse(1) { "" }
-            return w in setOf("out", "per", "each", "every") || (w == "of" && w2.firstOrNull()?.isDigit() == true)
+            return w in setOf("out", "per") || (w == "of" && w2.firstOrNull()?.isDigit() == true)
         }
 
         /**
@@ -726,8 +731,15 @@ class MisakiEnglish(
                 val ident = pv in IDENT_BEFORE || (prev.firstOrNull()?.isUpperCase() == true && prev.all { it.isLetter() } &&
                     pv2.isNotEmpty() && pv2.last() !in ".!?")
                 val listed = year && lastYearEnd >= 0 && LIST_GAP.matches(text.substring(lastYearEnd, m.range.first)) // 1051, 1052, and 1065
+                val tightM = TIGHT_RANGE.find(text.substring(m.range.last + 1)) // 1990-2010, 1107–37
+                val n2 = tightM?.groupValues?.get(1)?.takeIf { it.length == 4 }?.toInt()
+                // 2013–2014 games, not 1000–2000 men
+                val tight = tightM != null && (n2 == null || (n < n2 && n2 < 2100 && (n % 100 != 0 || n2 % 100 != 0)))
+                val ranged = year && lastYearEnd >= 0 && RANGE_GAP.matches(text.substring(lastYearEnd, m.range.first)) // the 2011 and 2012 races
                 year = when {
-                    nxt in YEAR_AFTER || pv in MONTHS -> true
+                    pv == "-" && RANGE_END.containsMatchIn(head) -> year // the end of 1000–2000: read like its start
+                    nxt in YEAR_AFTER || pv in MONTHS || tight || ranged -> true
+                    ident && n in YEARLIKE -> true // Paris 2024 uniforms
                     head.endsWith("(") && rest.startsWith(")") -> true // (1693)
                     (n >= 2100 && !ident) || (nxt in UNITS && after2.firstOrNull()?.isDigit() != true) || pv in NUMBER_BEFORE ||
                         (pv == "of" && pv2 == "out") || (nxt == "of" && !(pv in YEAR_BEFORE && n in YEARLIKE)) ||
@@ -735,8 +747,7 @@ class MisakiEnglish(
                     // in 1990 cases (of measles peaked | out of 2000); the 1990 figures showed
                     plural(after) -> (pv in TIME_BEFORE || possessive(pv) || (year && pv in RANGE)) &&
                         !counted(rest.trimStart().substring(after.length), n) && (n in YEARLIKE || pv in STRONG_TIME_BEFORE)
-                    listed || ident || pv in YEAR_BEFORE || (year && pv in RANGE) ||
-                        TIGHT_RANGE.containsMatchIn(text.substring(m.range.last + 1)) -> true // 1990-2010, 1107–37
+                    listed || ident || pv in YEAR_BEFORE || (year && pv in RANGE) || tight -> true
                     after.firstOrNull()?.isUpperCase() == true && !start -> true // the 1990 World Cup
                     (pv == "the" || possessive(pv)) && after.isNotEmpty() && after.all { it.isLetter() } &&
                         after == after.lowercase() -> true // the 2010 election
