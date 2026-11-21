@@ -1,0 +1,34 @@
+{
+  "about": "Northern English (Yorkshire/Lancashire-ish), from the ROADMAP step 1 listening test. Non-rhotic, so R marks are ignored.",
+  "rules": [
+    [
+      "ʊk",
+      "uːk"
+    ],
+    [
+      "Bɑː",
+      "a"
+    ],
+    [
+      "ʌ",
+      "ʊ"
+    ],
+    [
+      "A",
+      "eː"
+    ],
+    [
+      "Q",
+      "oː"
+    ],
+    [
+      "ʊə",
+      "ɔː"
+    ],
+    [
+      "([aeiouɪɛəʌʊɒɔɑɜAIQWY][^#]*[^aeiouɪɛəʌʊɒɔɑɜAIQWYˈˌː#])i(?=#)",
+      "$1ɪ"
+    ]
+  ],
+  "words": {}
+}

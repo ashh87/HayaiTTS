@@ -1,0 +1,111 @@
+{
+  "about": "Scottish (Edinburgh-ish), from the ROADMAP step 1 listening test: rhotic with a tapped r, one open vowel, LOT=THOUGHT, pure FACE/GOAT, no FOOT/GOOSE contrast.",
+  "rules": [
+    [
+      "ʊəR",
+      "uɾ"
+    ],
+    [
+      "ɪəR",
+      "iɾ"
+    ],
+    [
+      "ɛːR",
+      "eɾ"
+    ],
+    [
+      "IəR",
+      "aeɾ"
+    ],
+    [
+      "ɑːR",
+      "aɾ"
+    ],
+    [
+      "ɔːR",
+      "ɔɾ"
+    ],
+    [
+      "ɜːR",
+      "ʌɾ"
+    ],
+    [
+      "R",
+      "ɾ"
+    ],
+    [
+      "ɹ",
+      "ɾ"
+    ],
+    [
+      "Bɑː",
+      "a"
+    ],
+    [
+      "ɑː",
+      "a"
+    ],
+    [
+      "ɔː",
+      "ɔ"
+    ],
+    [
+      "ɒ",
+      "ɔ"
+    ],
+    [
+      "A",
+      "e"
+    ],
+    [
+      "Q",
+      "o"
+    ],
+    [
+      "([aeiouɪɛəʌʊɒɔɑɜAIQWY][^#]*[^aeiouɪɛəʌʊɒɔɑɜAIQWYˈˌː#])i(?=#)",
+      "$1e"
+    ],
+    [
+      "iː",
+      "i"
+    ],
+    [
+      "uː",
+      "u"
+    ],
+    [
+      "ʊ",
+      "u"
+    ],
+    [
+      "WəR",
+      "ʌʊɾ"
+    ],
+    [
+      "W",
+      "ʌʊ"
+    ],
+    [
+      "ɛː",
+      "e"
+    ],
+    [
+      "ɜː",
+      "ʌ"
+    ],
+    [
+      "ˈI(?=#)",
+      "ˈae"
+    ]
+  ],
+  "words": {
+    "loch": "lˈɔ",
+    "och": "ˈɔ",
+    "dreich": "dɾˈi",
+    "aye": "ˈae",
+    "wee": "wˈi",
+    "outwith": "ˈʌʊtwɪθ",
+    "bairn": "bˈeɾn",
+    "wean": "wˈen"
+  }
+}

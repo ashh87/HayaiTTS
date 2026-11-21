@@ -519,7 +519,7 @@ class SherpaTtsRuntime private constructor(
                     // espeak-ng's British voice is plain "en"; "en-gb" is not a voice name.
                     val espeakVoice = if (british) "en" else "en-us"
                     MisakiFrontend(
-                        MisakiAssets.english(context, british, File(dir, CUSTOM_WORDS_FILE)) {
+                        MisakiAssets.english(context, british, File(dir, CUSTOM_WORDS_FILE), File(dir, ACCENT_FILE)) {
                             Espeak.phonemize(context, it, espeakVoice).joinToString(" ")
                         },
                     )
@@ -884,6 +884,7 @@ class SherpaTtsRuntime private constructor(
         private const val DEFAULT_KOKORO_LANGUAGE = "en"
         /** Optional per-bundle custom words, misaki phonemes: `word<whitespace>phonemes`, `#` comments. */
         private const val CUSTOM_WORDS_FILE = "pronunciations.tsv"
+        private const val ACCENT_FILE = "accent.json" // accents/<name>.json from the kokoro tools (AccentRules)
         private val KOKORO_ESPEAK_VOICES = mapOf("pt" to "pt-br")
         private val ZIPVOICE_ENCODER_CANDIDATES = listOf("encoder.int8.onnx", "encoder.onnx")
         private val ZIPVOICE_DECODER_CANDIDATES = listOf("decoder.int8.onnx", "decoder.onnx")

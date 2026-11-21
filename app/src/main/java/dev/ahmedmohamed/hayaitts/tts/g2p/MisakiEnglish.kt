@@ -21,6 +21,9 @@ class MisakiEnglish(
     private val tagger: PosTagger,
     private val espeak: ((String) -> String?)?,
 ) {
+    /** Regional accent rules applied to the final British phonemes (null: plain misaki). */
+    var accent: AccentRules? = null
+
 
     /** Lookup over misaki's dictionary plus per-voice overrides (custom words win). */
     class Dict(private val base: PackedTable?, private val overrides: Map<String, Any> = emptyMap()) {
@@ -127,6 +130,7 @@ class MisakiEnglish(
         @Suppress("UNCHECKED_CAST")
         val merged = words.map { if (it is MToken) it else mergeTokens(it as List<MToken>, unk = "") }
         val ps = merged.map { (it.phonemes ?: "").replace('ɾ', 'T').replace('ʔ', 't') }.toMutableList()
+        accent?.apply(merged, ps)
         if (pre != null && pre.marks.isNotEmpty() && merged.isNotEmpty()) attachMarkers(merged, ps, pre.marks)
         // Kokoro v1.0 (version != '2.0') + KPipeline.en_tokenize: phonemes + one space per whitespace.
         return merged.indices.joinToString("") { i -> ps[i] + if (merged[i].whitespace.isNotEmpty()) " " else "" }.trim()

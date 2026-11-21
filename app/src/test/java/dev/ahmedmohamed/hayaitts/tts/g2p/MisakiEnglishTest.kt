@@ -145,7 +145,7 @@ class MisakiEnglishTest {
         assertEquals("three", NumberWords.decimal("3.0"))
     }
 
-    private companion object {
+    internal companion object {
         val ASSETS = File("src/main/assets/g2p")
         val tokenizer by lazy { EnglishTokenizer(File(ASSETS, "en_tokenizer.json").readText()) }
         val tagger by lazy { PosTagger(PackedTable.file(File(ASSETS, "pos_tagger.kv"))) }

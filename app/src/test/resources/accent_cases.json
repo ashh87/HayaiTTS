@@ -1,0 +1,92 @@
+[
+ {
+  "accent": "scottish",
+  "input": "I had a bath, then caught the last bus home.",
+  "phonemes": "ˌI had ɐ bˈaθ, ðˈɛn kˈɔt ðə lˈast bˈʌs hˈom."
+ },
+ {
+  "accent": "scottish",
+  "input": "The cars are parked further down the road.",
+  "phonemes": "ðə kˈaɾz aɾ pˈaɾkt fˈʌɾðəɾ dˌʌʊn ðə ɾˈod."
+ },
+ {
+  "accent": "scottish",
+  "input": "Wait for the late train, it's only eight.",
+  "phonemes": "wˈet fɔɾ ðə lˈet tɾˈen, ɪts ˈonle ˈet."
+ },
+ {
+  "accent": "scottish",
+  "input": "Look at the book by the pool.",
+  "phonemes": "lˈuk at ðə bˈuk bI ðə pˈul."
+ },
+ {
+  "accent": "scottish",
+  "input": "There's a wee loch near the church.",
+  "phonemes": "ðˌeɾz ɐ wˈi lˈɔ nˌiɾ ðə ʧˈʌɾʧ."
+ },
+ {
+  "accent": "scottish",
+  "input": "Are you sure you're from here? Aye, born and bred.",
+  "phonemes": "ˌaɾ ju ʃˈuɾ jɔɾ fɾɔm hˈiɾ? ˈae, bˈɔɾn and bɾˈɛd."
+ },
+ {
+  "accent": "scottish",
+  "input": "We sailed on the loch. It's a dreich day, och aye.",
+  "phonemes": "wˌi sˈeld ˌɔn ðə lˈɔk. ˌɪts ɐ dɾˈi dˈe, ˈɔ ˈae."
+ },
+ {
+  "accent": "scottish",
+  "input": "The darling's cars, parked in the afternoon, were plastered with letters.",
+  "phonemes": "ðə dˈaɾlɪŋz kˈaɾz, pˈaɾkt ɪn ði ˌaftəɾnˈun, wʌɾ plˈastəɾd wɪð lˈɛtəɾz."
+ },
+ {
+  "accent": "scottish",
+  "input": "Say [loch](/lˈɒk/) the English way.",
+  "phonemes": "sˈe lˈɒk ði ˈɪŋɡlɪʃ wˈe."
+ },
+ {
+  "accent": "northern",
+  "input": "I had a bath, then caught the last bus home.",
+  "phonemes": "ˌI had ɐ bˈaθ, ðˈɛn kˈɔːt ðə lˈast bˈʊs hˈoːm."
+ },
+ {
+  "accent": "northern",
+  "input": "The cars are parked further down the road.",
+  "phonemes": "ðə kˈɑːz ɑː pˈɑːkt fˈɜːðə dˌWn ðə ɹˈoːd."
+ },
+ {
+  "accent": "northern",
+  "input": "Wait for the late train, it's only eight.",
+  "phonemes": "wˈeːt fɔː ðə lˈeːt tɹˈeːn, ɪts ˈoːnlɪ ˈeːt."
+ },
+ {
+  "accent": "northern",
+  "input": "Look at the book by the pool.",
+  "phonemes": "lˈuːk at ðə bˈuːk bI ðə pˈuːl."
+ },
+ {
+  "accent": "northern",
+  "input": "There's a wee loch near the church.",
+  "phonemes": "ðˌɛːz ɐ wˈiː lˈɒk nˌɪə ðə ʧˈɜːʧ."
+ },
+ {
+  "accent": "northern",
+  "input": "Are you sure you're from here? Aye, born and bred.",
+  "phonemes": "ˌɑː juː ʃˈɔː jɔː fɹɒm hˈɪə? ˈI, bˈɔːn and bɹˈɛd."
+ },
+ {
+  "accent": "northern",
+  "input": "We sailed on the loch. It's a dreich day, och aye.",
+  "phonemes": "wˌiː sˈeːld ˌɒn ðə lˈɒk. ˌɪts ɐ dɹˈIk dˈeː, ˈɒk ˈI."
+ },
+ {
+  "accent": "northern",
+  "input": "The darling's cars, parked in the afternoon, were plastered with letters.",
+  "phonemes": "ðə dˈɑːlɪŋz kˈɑːz, pˈɑːkt ɪn ði ˌaftənˈuːn, wɜː plˈastəd wɪð lˈɛtəz."
+ },
+ {
+  "accent": "northern",
+  "input": "Say [loch](/lˈɒk/) the English way.",
+  "phonemes": "sˈeː lˈɒk ði ˈɪŋɡlɪʃ wˈeː."
+ }
+]

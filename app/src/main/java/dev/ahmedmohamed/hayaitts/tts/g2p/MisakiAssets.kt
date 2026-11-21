@@ -16,7 +16,7 @@ object MisakiAssets {
     private val accents = HashMap<Boolean, Accent>()
 
     @Synchronized
-    fun english(context: Context, british: Boolean, customWords: File, espeak: (String) -> String?): MisakiEnglish {
+    fun english(context: Context, british: Boolean, customWords: File, accentRules: File? = null, espeak: (String) -> String?): MisakiEnglish {
         val (tok, tag, accent) = shared(context, british)
         return MisakiEnglish(
             british,
@@ -25,8 +25,15 @@ object MisakiAssets {
             tok,
             tag,
             espeak,
-        )
+        ).apply {
+            if (british && accentRules?.isFile == true) {
+                val table = lexsets ?: PackedTable.asset(context, "g2p/accent_lexsets.kv").also { lexsets = it }
+                this.accent = AccentRules(accentRules.readText(), table)
+            }
+        }
     }
+
+    private var lexsets: PackedTable? = null
 
     /** Opens everything and pages it in, so the first sentence does not wait on it. */
     @Synchronized
