@@ -637,30 +637,49 @@ class MisakiEnglish(
             "sept", "oct", "nov", "dec",
         )
         private val IDENT_BEFORE = setOf("flight", "room", "bus", "route", "platform", "gate", "train", "model", "no.", "number")
-        private val NUMBER_BEFORE = setOf(
-            "about", "around", "over", "under", "nearly", "almost", "exactly", "only", "just", "than",
-            "some", "cost", "costs", "paid", "pay", "weighs", "scored", "total", "approximately",
+        private val NUMBER_BEFORE = setOf("cost", "costs", "paid", "pay", "weighs", "scored", "total", "than", "sold", "earned", "raised")
+        // a count, unless the number looks like a year (around 1990, things...)
+        private val ABOUT_BEFORE = setOf(
+            "about", "around", "approximately", "roughly", "nearly", "almost", "over", "under", "exactly", "only", "just", "some",
         )
         private val YEAR_AFTER = setOf("ad", "bc", "bce", "ce")
         private val YEAR_VERBS = setOf("was", "is", "will", "has", "had", "saw", "brought", "marked", "began", "ended")
         private val RANGE = setOf("to", "and", "or", "-", "–")
-        private val UNITS = setOf(
+        private val UNITS = setOf( // a count
             "m", "metre", "metres", "meter", "meters", "km", "kilometre", "kilometres", "kilometer", "kilometers",
             "mi", "mile", "miles", "yd", "yard", "yards", "ft", "foot", "feet", "kg", "g", "mph", "kph", "%",
-            "percent", "per", "pounds", "quid", "euros", "dollars", "pence", "of", "people", "children", "men",
-            "women", "staff", "times", "sheep", "fish", "data", "police", "cattle", "teeth", "mice",
+            "percent", "per", "pounds", "quid", "euros", "dollars", "pence", "of", "times", "years", "months",
+            "weeks", "days", "hours", "minutes", "seconds", "calories", "words", "pages", "votes", "points",
         )
+        private val PLURALS = setOf("people", "children", "men", "women", "staff", "sheep", "fish", "data", "police", "cattle", "teeth", "mice")
+        private val TIME_BEFORE = setOf("in", "by", "since", "from", "until", "till", "before", "after", "during", "between")
+        private val YEARLIKE = 1800..2099 // with no other cue these read as years ("1990"), others in full ("1250")
         private const val NUM = "[1-9]\\d{3}(?![\\w.,:]?\\w)"
         private val FOUR_DIGITS = Regex("(?<![\\w£$€¥.,:])($NUM)")
         private val RANGE_NEXT = Regex("^\\s*(?:to|and|or|-|–)\\s*$NUM")
         private val TIGHT_RANGE = Regex("^[-–]$NUM")
         private val LAST_WORD = Regex("(\\S+)\\s*$")
+        private val WORD_BEFORE_LAST = Regex("(\\S+)\\s+\\S+\\s*$")
+        private val CLAUSE_END = Regex("^\\s*([.,;:!?]|$)")
+        private val SPACES = Regex("\\s+")
         private val FIRST_WORD = Regex("^\\s*([^\\s.,;:!?]+|[.,;:!?])")
 
-        /** A word that makes the number a count: a unit, or a plural noun (by its spelling). */
-        private fun plural(w: String) = w in UNITS ||
+        /** A plural noun, by its spelling. */
+        private fun plural(w: String) = w in PLURALS ||
             (w.all { it.isLetter() } && w == w.lowercase() && w.length > 3 && w.endsWith("s") &&
                 !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
+
+        /**
+         * After "in 1990 cases": a count if the phrase ends there or goes on as one ("out of 2000", "per year"),
+         * a year if the sentence goes on ("in 1990 cases of measles peaked").
+         */
+        private fun countAfterNoun(rest: String): Boolean {
+            if (CLAUSE_END.containsMatchIn(rest)) return true
+            val ws = rest.lowercase().trim().split(SPACES)
+            val w = ws[0]
+            val w2 = ws.getOrElse(1) { "" }
+            return w in setOf("out", "per", "each", "every") || (w == "of" && w2.firstOrNull()?.isDigit() == true)
+        }
 
         /**
          * Misaki reads every 4-digit number in pairs, as a year ("1250 metres" -> "twelve fifty"). Pairs suit
@@ -679,15 +698,20 @@ class MisakiEnglish(
                 val n = m.value.toInt()
                 val nxt = after.lowercase()
                 val pv = prev.lowercase()
+                val pv2 = WORD_BEFORE_LAST.find(head)?.groupValues?.get(1)?.lowercase() ?: ""
                 val start = prev.isEmpty() || prev.last() in ".!?"
                 year = when {
                     nxt in YEAR_AFTER -> true
-                    n >= 2100 || plural(nxt) || pv in NUMBER_BEFORE -> false
+                    n >= 2100 || nxt in UNITS || pv in NUMBER_BEFORE || (pv == "of" && pv2 == "out") ||
+                        (pv in ABOUT_BEFORE && (n !in YEARLIKE || plural(nxt))) -> false
+                    // in 1990 cases (of measles peaked | out of 2000); the 1990 figures showed
+                    plural(nxt) -> (pv in TIME_BEFORE || pv == "the" || (year && pv in RANGE)) && n in YEARLIKE &&
+                        !countAfterNoun(rest.trimStart().substring(after.length))
                     pv in YEAR_BEFORE || pv in IDENT_BEFORE || (year && pv in RANGE) ||
                         TIGHT_RANGE.containsMatchIn(text.substring(m.range.last + 1)) -> true
                     after.firstOrNull()?.isUpperCase() == true && !start -> true // the 1990 World Cup
                     pv == "the" && after.isNotEmpty() && after.all { it.isLetter() } && after == after.lowercase() -> true
-                    else -> start && nxt in YEAR_VERBS // 2025 was a good year
+                    else -> n in YEARLIKE || (start && nxt in YEAR_VERBS) // 1990; 1250 was a bad year
                 }
                 if (year) m.value else m.value[0] + "," + m.value.substring(1)
             }
