@@ -24,6 +24,9 @@ class MisakiEnglish(
     /** Regional accent rules applied to the final British phonemes (null: plain misaki). */
     var accent: AccentRules? = null
 
+    /** British number reading (britishNumbers, "hundred and"); off only to compare with stock misaki. */
+    internal var ukNumbers = british
+
 
     /** Lookup over misaki's dictionary plus per-voice overrides (custom words win). */
     class Dict(private val base: PackedTable?, private val overrides: Map<String, Any> = emptyMap()) {
@@ -52,7 +55,7 @@ class MisakiEnglish(
 
     /** Phonemes for [text], joined the way KPipeline.en_tokenize joins them. */
     fun phonemize(text: String): String {
-        val pre = withoutMarkers(preprocess(text))
+        val pre = withoutMarkers(preprocess(if (ukNumbers) britishNumbers(text) else text))
         val toks = tokenizer.tokenize(pre.text)
         return if (toks.isEmpty()) "" else phonemize(toks, tagger.tag(toks.map { it.text }), pre)
     }
@@ -528,6 +531,8 @@ class MisakiEnglish(
             val text = if (escape) num else NumberWords.cardinal(num.toBigInteger())
             for (w in text.split(NON_LETTERS)) {
                 if (w != "and") result += lookup(w, null, if (w == "point") -2.0 else null, null)
+                // British "and", reduced and joined on (hundred-ən fifty): misaki's "n" number flag, always on
+                else if (ukNumbers && result.isNotEmpty()) result[result.size - 1] = result.last().let { Result((it.ps ?: "") + "ən", it.rating) }
             }
         }
         when {
@@ -622,6 +627,72 @@ class MisakiEnglish(
     }
 
     companion object {
+        // Which 4-digit numbers read in pairs (years, flight 1250) and which in full: see britishNumbers
+        private val YEAR_BEFORE = setOf(
+            "in", "since", "from", "until", "till", "by", "before", "after", "during", "circa", "c.", "of",
+            "year", "born", "died", "founded", "built", "established", "est.", "copyright", "©", "vintage",
+            "summer", "winter", "spring", "autumn", "fall", "between",
+            "january", "february", "march", "april", "may", "june", "july", "august", "september",
+            "october", "november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep",
+            "sept", "oct", "nov", "dec",
+        )
+        private val IDENT_BEFORE = setOf("flight", "room", "bus", "route", "platform", "gate", "train", "model", "no.", "number")
+        private val NUMBER_BEFORE = setOf(
+            "about", "around", "over", "under", "nearly", "almost", "exactly", "only", "just", "than",
+            "some", "cost", "costs", "paid", "pay", "weighs", "scored", "total", "approximately",
+        )
+        private val YEAR_AFTER = setOf("ad", "bc", "bce", "ce")
+        private val YEAR_VERBS = setOf("was", "is", "will", "has", "had", "saw", "brought", "marked", "began", "ended")
+        private val RANGE = setOf("to", "and", "or", "-", "–")
+        private val UNITS = setOf(
+            "m", "metre", "metres", "meter", "meters", "km", "kilometre", "kilometres", "kilometer", "kilometers",
+            "mi", "mile", "miles", "yd", "yard", "yards", "ft", "foot", "feet", "kg", "g", "mph", "kph", "%",
+            "percent", "per", "pounds", "quid", "euros", "dollars", "pence", "of", "people", "children", "men",
+            "women", "staff", "times", "sheep", "fish", "data", "police", "cattle", "teeth", "mice",
+        )
+        private const val NUM = "[1-9]\\d{3}(?![\\w.,:]?\\w)"
+        private val FOUR_DIGITS = Regex("(?<![\\w£$€¥.,:])($NUM)")
+        private val RANGE_NEXT = Regex("^\\s*(?:to|and|or|-|–)\\s*$NUM")
+        private val TIGHT_RANGE = Regex("^[-–]$NUM")
+        private val LAST_WORD = Regex("(\\S+)\\s*$")
+        private val FIRST_WORD = Regex("^\\s*([^\\s.,;:!?]+|[.,;:!?])")
+
+        /** A word that makes the number a count: a unit, or a plural noun (by its spelling). */
+        private fun plural(w: String) = w in UNITS ||
+            (w.all { it.isLetter() } && w == w.lowercase() && w.length > 3 && w.endsWith("s") &&
+                !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
+
+        /**
+         * Misaki reads every 4-digit number in pairs, as a year ("1250 metres" -> "twelve fifty"). Pairs suit
+         * years and identifiers; quantities read in full, so they get a comma (1,250). Decided from the words
+         * around each number; same as kokoro-tools expressive.british_numbers (cases: number_cases.json).
+         */
+        internal fun britishNumbers(text: String): String {
+            var year = false
+            return FOUR_DIGITS.replace(text) { m ->
+                val head = text.substring(0, m.range.first)
+                var prev = LAST_WORD.find(head)?.groupValues?.get(1)?.trim('(', '"', '\'') ?: ""
+                if (head.trimEnd().endsWith("-") || head.trimEnd().endsWith("–")) prev = "-"
+                var rest = text.substring(m.range.last + 1)
+                RANGE_NEXT.find(rest)?.let { rest = rest.substring(it.range.last + 1) }
+                val after = FIRST_WORD.find(rest)?.groupValues?.get(1) ?: ""
+                val n = m.value.toInt()
+                val nxt = after.lowercase()
+                val pv = prev.lowercase()
+                val start = prev.isEmpty() || prev.last() in ".!?"
+                year = when {
+                    nxt in YEAR_AFTER -> true
+                    n >= 2100 || plural(nxt) || pv in NUMBER_BEFORE -> false
+                    pv in YEAR_BEFORE || pv in IDENT_BEFORE || (year && pv in RANGE) ||
+                        TIGHT_RANGE.containsMatchIn(text.substring(m.range.last + 1)) -> true
+                    after.firstOrNull()?.isUpperCase() == true && !start -> true // the 1990 World Cup
+                    pv == "the" && after.isNotEmpty() && after.all { it.isLetter() } && after == after.lowercase() -> true
+                    else -> start && nxt in YEAR_VERBS // 2025 was a good year
+                }
+                if (year) m.value else m.value[0] + "," + m.value.substring(1)
+            }
+        }
+
         // count of commas before each, by ear (3 for love, 2 for mate)
         private val VOCATIVES = mapOf(
             "love" to 3, "mate" to 2, "pet" to 2, "duck" to 2, "darling" to 2, "dear" to 2, "hun" to 2, "babe" to 2,

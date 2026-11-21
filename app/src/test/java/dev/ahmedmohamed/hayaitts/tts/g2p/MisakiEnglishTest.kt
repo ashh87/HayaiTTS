@@ -1,5 +1,7 @@
 package dev.ahmedmohamed.hayaitts.tts.g2p
 
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,7 +40,7 @@ class MisakiEnglishTest {
         var same = 0
         val mismatches = mutableListOf<String>()
         for (british in listOf(true, false)) {
-            val g = g2p(british)
+            val g = g2p(british).apply { ukNumbers = false } // golden.tsv is stock misaki
             for (r in rows.filter { it.british == british }) {
                 val got = if (withSpacyTags) g.phonemize(r.toks, r.tags) else g.phonemize(r.text)
                 if (got == r.ps.trim()) same++ else mismatches += "${if (british) "gb" else "us"} | ${r.text}\n  want ${r.ps.trim()}\n  got  $got"
@@ -132,6 +134,35 @@ class MisakiEnglishTest {
             "I love my mate." to "ˌI lˈʌv mI mˈAt.",
             "Take this, love, and go." to "tˈAk ðˈɪs, lˈʌv, and ɡˌQ.",
             "All I've got, [love](/lˈʌv/)." to "ˈɔːl ˌIv ɡˈɒt, lˈʌv.",
+        )
+        for ((text, want) in cases) assertEquals(text, want, g.phonemize(text))
+    }
+
+    @Test
+    fun `four-digit numbers read in pairs or in full as in the kokoro tools`() {
+        val cases = kotlinx.serialization.json.Json.parseToJsonElement(javaClass.classLoader!!.getResource("number_cases.json")!!.readText())
+        var n = 0
+        for (c in cases.jsonArray) {
+            val (text, want) = c.jsonArray.map { it.jsonPrimitive.content }
+            if (want.isEmpty()) continue // a heading
+            assertEquals(text, want, MisakiEnglish.britishNumbers(text))
+            n++
+        }
+        assertTrue(n > 30)
+    }
+
+    @Test
+    fun `numbers read British style, years only in a date context`() {
+        val g = g2p(british = true)
+        val cases = listOf( // expected from the kokoro tools' expressive.phonemes_with_markers
+            "Turn left in 1250 metres." to "tˈɜːn lˈɛft ɪn wˈʌn θˈWzᵊnd tˈuː hˈʌndɹədən fˈɪfti mˈiːtəz.",
+            "It costs £350." to "ˌɪt kˈɒsts θɹˈiː hˈʌndɹədən fˈɪfti pˈWndz.",
+            "In 1250 they built it." to "ɪn twˈɛlv fˈɪfti ðA bˈɪlt ɪt.",
+            "From 1990 to 2010." to "fɹˌɒm nˌIntˈiːn nˈInti tə twˈɛnti tˈɛn.",
+            "21 November 2025." to "twˈɛnti wˈʌn nQvˈɛmbə twˈɛnti twˈɛnti fˈIv.",
+            "There were 2005 people." to "ðˌɛː wɜː tˈuː θˈWzᵊndən fˈIv pˈiːpᵊl.",
+            "It was 1066 AD." to "ˌɪt wɒz tˈɛn sˈɪksti sˈɪks ˌAdˈiː.",
+            "The 1990s." to "ðə nˌIntˈiːn nˈIntiz.",
         )
         for ((text, want) in cases) assertEquals(text, want, g.phonemize(text))
     }
