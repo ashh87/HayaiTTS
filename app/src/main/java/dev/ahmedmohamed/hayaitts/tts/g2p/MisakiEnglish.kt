@@ -130,10 +130,27 @@ class MisakiEnglish(
         @Suppress("UNCHECKED_CAST")
         val merged = words.map { if (it is MToken) it else mergeTokens(it as List<MToken>, unk = "") }
         val ps = merged.map { (it.phonemes ?: "").replace('ɾ', 'T').replace('ʔ', 't') }.toMutableList()
+        vocatives(merged, ps)
         accent?.apply(merged, ps)
         if (pre != null && pre.marks.isNotEmpty() && merged.isNotEmpty()) attachMarkers(merged, ps, pre.marks)
         // Kokoro v1.0 (version != '2.0') + KPipeline.en_tokenize: phonemes + one space per whitespace.
         return merged.indices.joinToString("") { i -> ps[i] + if (merged[i].whitespace.isNotEmpty()) " " else "" }.trim()
+    }
+
+    /**
+     * Terms of address closing a sentence after a comma ("Cheers, mate."): unstressed, after a longer
+     * comma (commas in a row). The kokoro tools' expressive.vocatives, kept identical.
+     */
+    private fun vocatives(tokens: List<MToken>, ps: MutableList<String>) {
+        for (i in 1 until tokens.size) {
+            val n = VOCATIVES[tokens[i].text.lowercase()] ?: continue
+            if (tokens[i - 1].text != "," || tokens[i].rating == 5 || ps[i].isEmpty()) continue
+            val next = (i + 1 until tokens.size).firstOrNull { ps[it].isNotEmpty() }
+            if (next == null || tokens[next].text.all { it in ".!?" }) {
+                ps[i] = ps[i].filterNot { it == 'ˈ' || it == 'ˌ' }
+                ps[i - 1] = ",".repeat(n)
+            }
+        }
     }
 
     /**
@@ -605,6 +622,11 @@ class MisakiEnglish(
     }
 
     companion object {
+        // count of commas before each, by ear (3 for love, 2 for mate)
+        private val VOCATIVES = mapOf(
+            "love" to 3, "mate" to 2, "pet" to 2, "duck" to 2, "darling" to 2, "dear" to 2, "hun" to 2, "babe" to 2,
+            "pal" to 2, "hen" to 2, "chuck" to 2, "sweetheart" to 2,
+        )
         const val PRIMARY = 'ˈ'
         const val SECONDARY = 'ˌ'
         private const val STRESSES = "ˌˈ"

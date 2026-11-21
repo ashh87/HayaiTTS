@@ -114,6 +114,21 @@ class MisakiEnglishTest {
     }
 
     @Test
+    fun `terms of address after a closing comma lose stress and get a longer comma`() {
+        val g = g2p(british = true)
+        val cases = listOf( // expected from the kokoro tools' expressive.phonemes_with_markers
+            "That's all I've got, love." to "ðˈats ˈɔːl ˌIv ɡˈɒt,,, lʌv.",
+            "Cheers, mate!" to "ʧˈɪəz,, mAt!",
+            "Thanks, darling." to "θˈaŋks,, dɑːlɪŋ.",
+            "Love, it's late." to "lˈʌv, ɪts lˈAt.",
+            "I love my mate." to "ˌI lˈʌv mI mˈAt.",
+            "Take this, love, and go." to "tˈAk ðˈɪs, lˈʌv, and ɡˌQ.",
+            "All I've got, [love](/lˈʌv/)." to "ˈɔːl ˌIv ɡˈɒt, lˈʌv.",
+        )
+        for ((text, want) in cases) assertEquals(text, want, g.phonemize(text))
+    }
+
+    @Test
     fun `chunks carry open emphasis and level markers forward`() {
         val carried = dev.ahmedmohamed.hayaitts.tts.MisakiFrontend.carryMarkers(
             listOf("a \uE000b \uE002\uE002c.", "d\uE001 e.", "f \uE003g.", "h."),
