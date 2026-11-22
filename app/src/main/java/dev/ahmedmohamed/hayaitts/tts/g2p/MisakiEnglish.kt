@@ -672,6 +672,10 @@ class MisakiEnglish(
         private val TOKEN_HEAD = Regex("\\S*$")
         private val TOKEN_TAIL = Regex("^\\S*")
         private val MID = Regex("mid-$", RegexOption.IGNORE_CASE)
+        private val HEDGE = Regex("\\s+(?:at\\s+(?:least|most|the\\s+(?:latest|earliest))|as\\s+(?:early|late)\\s+as)\\s*$")
+        private val BACK_TO = Regex(
+            "\\b(?:(?:dat|trac)(?:e|es|ed|ing)(?:\\s+back)?|(?:go|goes|went|going|gone)\\s+back)\\s+to\\s*$", RegexOption.IGNORE_CASE,
+        )
         private val FIRST_WORD = Regex("^\\s*([^\\s.,;:!?)]+|[.,;:!?)])")
         private val CLAUSE_END = Regex("^\\s*([.,;:!?)]|$)")
         private val LIST_GAP = Regex("[,\\s]*(and\\s+|or\\s+)?")
@@ -682,7 +686,7 @@ class MisakiEnglish(
         /** A plural noun, by its spelling ([w] as written: "James" is a name). */
         private fun plural(w: String) = w.lowercase() in PLURALS ||
             (w.isNotEmpty() && w.all { it.isLetter() } && w == w.lowercase() && w.length > 3 && w.endsWith("s") &&
-                !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
+                !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is") && w != "series" && w != "species")
 
         private fun possessive(w: String) = w.endsWith("'s") || w.endsWith("’s")
 
@@ -713,20 +717,25 @@ class MisakiEnglish(
                 val head = text.substring(0, m.range.first)
                 var rest = text.substring(m.range.last + 1)
                 val token = TOKEN_HEAD.find(head)!!.value + m.value + TOKEN_TAIL.find(rest)!!.value
-                var prev = LAST_WORD.find(head)?.groupValues?.get(1)?.trim('(', '"', '\'') ?: ""
-                val pv2 = WORD_BEFORE_LAST.find(head)?.groupValues?.get(1)?.lowercase() ?: ""
-                if (token.count { it == '-' || it == '–' } > 1 || prev.lowercase() in NO_TOUCH || pv2 in NO_TOUCH) {
+                val cue = HEDGE.replace(head, " ") // since at least 1600
+                val prev = LAST_WORD.find(cue)?.groupValues?.get(1)?.trim('(', '"', '\'') ?: ""
+                val pv = prev.lowercase()
+                val pv2 = WORD_BEFORE_LAST.find(cue)?.groupValues?.get(1)?.lowercase() ?: ""
+                if (token.count { it == '-' || it == '–' } > 1 || pv in NO_TOUCH || pv2 in NO_TOUCH) {
                     continue // ISBN 978-0-7524-9485-2: left as it is
                 }
-                if (MID.containsMatchIn(head)) prev = "mid" // mid-1066
-                else if (head.trimEnd().endsWith("-") || head.trimEnd().endsWith("–")) prev = "-" // 1990-2010
+                val mid = MID.containsMatchIn(head) // mid-1066
+                val dash = !mid && (head.trimEnd().endsWith("-") || head.trimEnd().endsWith("–")) // 1990-2010
+                val back = BACK_TO.containsMatchIn(head) // dates back to 1080
                 RANGE_NEXT.find(rest)?.let { rest = rest.substring(it.range.last + 1) } // 1990 to 2000: the cue is after the range
                 val after = FIRST_WORD.find(rest)?.groupValues?.get(1) ?: ""
                 val after2 = rest.trim().split(SPACES).getOrElse(1) { "" }
                 val n = m.value.toInt()
                 val nxt = after.lowercase()
-                val pv = prev.lowercase()
                 val start = prev.isEmpty() || prev.last() in ".!?"
+                val yearCue = pv in YEAR_BEFORE || mid || back // in 1990
+                val timeCue = pv in TIME_BEFORE || back // in / the / their 1990 (before a plural)
+                val carry = year && (pv in RANGE || dash) // the 2011 and 2012 races
                 // flight 4418; Fire of London 1666, CP 4418 (a capitalised word, not the sentence's first)
                 val ident = pv in IDENT_BEFORE || (prev.firstOrNull()?.isUpperCase() == true && prev.all { it.isLetter() } &&
                     pv2.isNotEmpty() && pv2.last() !in ".!?")
@@ -735,22 +744,28 @@ class MisakiEnglish(
                 val n2 = tightM?.groupValues?.get(1)?.takeIf { it.length == 4 }?.toInt()
                 // 2013–2014 games, not 1000–2000 men
                 val tight = tightM != null && (n2 == null || (n < n2 && n2 < 2100 && (n % 100 != 0 || n2 % 100 != 0)))
-                val ranged = year && lastYearEnd >= 0 && RANGE_GAP.matches(text.substring(lastYearEnd, m.range.first)) // the 2011 and 2012 races
+                val ranged = year && lastYearEnd >= 0 && RANGE_GAP.matches(text.substring(lastYearEnd, m.range.first))
+                val noun = after.isNotEmpty() && after.all { it.isLetter() } && after == after.lowercase()
+                // A decision list, as classify_numbers in the kokoro tools: the first rule that fits decides
                 year = when {
-                    pv == "-" && RANGE_END.containsMatchIn(head) -> year // the end of 1000–2000: read like its start
-                    nxt in YEAR_AFTER || pv in MONTHS || tight || ranged -> true
+                    // certain: dates and ranges
+                    dash && RANGE_END.containsMatchIn(head) -> year // the end of 1000–2000: read like its start
+                    nxt in YEAR_AFTER || pv in MONTHS || tight || ranged -> true // AD/BC, 7 October 2023, ranges
                     ident && n in YEARLIKE -> true // Paris 2024 uniforms
                     head.endsWith("(") && rest.startsWith(")") -> true // (1693)
+                    // strong: a count (unit, cost 1250, out of, 1250 of them, about)
                     (n >= 2100 && !ident) || (nxt in UNITS && after2.firstOrNull()?.isDigit() != true) || pv in NUMBER_BEFORE ||
-                        (pv == "of" && pv2 == "out") || (nxt == "of" && !(pv in YEAR_BEFORE && n in YEARLIKE)) ||
+                        (pv == "of" && pv2 == "out") || (nxt == "of" && !(yearCue && n in YEARLIKE)) ||
                         (pv in ABOUT_BEFORE && (n !in YEARLIKE || plural(after))) -> false
-                    // in 1990 cases (of measles peaked | out of 2000); the 1990 figures showed
-                    plural(after) -> (pv in TIME_BEFORE || possessive(pv) || (year && pv in RANGE)) &&
+                    // medium: a plural noun after (in 1990 cases out of 2000 | of measles peaked; the 1990 figures showed)
+                    plural(after) -> (timeCue || possessive(pv) || carry) &&
                         !counted(rest.trimStart().substring(after.length), n) && (n in YEARLIKE || pv in STRONG_TIME_BEFORE)
-                    listed || ident || pv in YEAR_BEFORE || (year && pv in RANGE) || tight -> true
+                    listed || ident || yearCue || carry -> true
+                    // weak
                     after.firstOrNull()?.isUpperCase() == true && !start -> true // the 1990 World Cup
-                    (pv == "the" || possessive(pv)) && after.isNotEmpty() && after.all { it.isLetter() } &&
-                        after == after.lowercase() -> true // the 2010 election
+                    (pv == "the" || possessive(pv)) && noun -> true // the 2010 election
+                    (pv2 == "the" || possessive(pv2)) && prev.isNotEmpty() && prev.all { it.isLetter() } && prev == pv &&
+                        n in YEARLIKE && noun -> true // the classic 1902 series
                     else -> n in YEARLIKE || (start && nxt in YEAR_VERBS) // 1990; 1250 was a bad year
                 }
                 if (year) lastYearEnd = m.range.last + 1

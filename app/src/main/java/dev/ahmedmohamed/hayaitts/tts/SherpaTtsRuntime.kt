@@ -210,6 +210,8 @@ class SherpaTtsRuntime private constructor(
      * (returning 0 stops); pauses arrive as silent chunks. Emotion and pitch pick a row of
      * an expressive voice when [sid] is its base speaker (0); other voices still get pauses,
      * rate and volume. Without [onChunk] the whole result is returned instead.
+     * [systemPitch] is Android's pitch setting (1.0 = normal): a real pitch shift on an expressive
+     * voice (the nearest pitch row, at the same speed), the [pitch] resampler on others.
      */
     fun synthesizeMarkup(
         voiceId: String,
@@ -221,9 +223,11 @@ class SherpaTtsRuntime private constructor(
         noiseScale: Float = 0.667f,
         noiseScaleW: Float = 0.8f,
         languageHint: String? = null,
+        systemPitch: Float = 1.0f,
         onChunk: ((FloatArray) -> Int)? = null,
     ): SynthesisOutput {
         val engine = engine(voiceId, lengthScale, noiseScale, noiseScaleW, text, languageHint)
+        val systemSt = 12 * kotlin.math.log2(systemPitch.toDouble()) // semitones
         val sampleRate = engine.tts.sampleRate()
         val collected = ArrayList<FloatArray>()
         var go = true
@@ -234,13 +238,14 @@ class SherpaTtsRuntime private constructor(
         for (seg in Markup.parse(text)) {
             if (seg.text.isNotBlank()) {
                 val rows = engine.expressive?.takeIf { sid == 0 }
-                val row = rows?.rowFor(seg.emotion, seg.intensity, seg.pitch)
+                val row = rows?.rowFor(seg.emotion, seg.intensity, seg.pitch + systemSt)
                 val segSid = row?.sid ?: sid
                 // Span markers only mean something to the expressive model; others would read them as junk.
                 val segText = if (row != null) rows.bridge(row, seg.intensity) + seg.text else Markup.stripMarkers(seg.text)
                 val gain = Math.pow(10.0, seg.volume / 20).toFloat()
                 synthesizeStreaming(
-                    voiceId, segText, segSid, (speed * seg.rate).toFloat().coerceIn(0.25f, 4f), pitch,
+                    voiceId, segText, segSid, (speed * seg.rate).toFloat().coerceIn(0.25f, 4f),
+                    if (row != null) pitch else pitch * systemPitch,
                     lengthScale, noiseScale, noiseScaleW, languageHint,
                 ) { chunk ->
                     if (gain != 1f) for (i in chunk.indices) chunk[i] *= gain

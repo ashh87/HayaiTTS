@@ -251,6 +251,7 @@ class HayaiTtsService : TextToSpeechService() {
                 noiseScale = tuning.noiseScale,
                 noiseScaleW = tuning.noiseScaleW,
                 languageHint = requestLanguageHint,
+                systemPitch = (request.pitch / 100f).coerceIn(0.25f, 4f),
             ) { chunk -> if (streamPcm(callback, chunk)) 1 else 0 }
         } catch (t: Throwable) {
             log.e(t) { "sherpa-onnx synthesis failed" }
