@@ -87,8 +87,77 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
     var revealed by mutableStateOf(false)
         private set
 
+    // Questions from Claude
+    var questions by mutableStateOf<List<LabServer.Question>>(emptyList())
+        private set
+    /** Per question: the clip indices in the order shown (shuffled when blind). */
+    val order = mutableStateMapOf<String, List<Int>>()
+    val choice = mutableStateMapOf<String, String>()
+    val reply = mutableStateMapOf<String, String>()
+    val answeredNow = mutableStateMapOf<String, String>()
+
+    /** Questions skipped for now: shown after the others. */
+    val skipped = mutableStateListOf<String>()
+
+    /** Open questions in the order to answer them: by set, skipped ones last. */
+    fun openQuestions(): List<LabServer.Question> =
+        questions.filter { !it.answered && it.id !in answeredNow }.sortedBy { it.id in skipped }
+
+    fun skip(q: LabServer.Question) {
+        skipped.remove(q.id)
+        skipped += q.id
+    }
+
     init {
         if (url.isNotBlank()) connect()
+        Questions.schedule(app)
+        viewModelScope.launch {
+            while (true) { // while the app is open, look for new questions every minute
+                delay(60_000)
+                if (server != null) runCatching { loadQuestions() }
+            }
+        }
+    }
+
+    fun refreshQuestions() = launch("Fetching questions") { status = "${loadQuestions()} open question(s) from Claude" }
+
+    /** Fetches the questions; returns how many are still open. */
+    private suspend fun loadQuestions(): Int {
+        val s = server ?: error("Not connected")
+        questions = withContext(netThreads) { s.questions() }
+        Questions.markSeen(getApplication(), questions.map { it.id }) // seen in the app: no notification for them
+        for (q in questions) order.getOrPut(q.id) { q.clips.indices.toList().let { if (q.blind) it.shuffled() else it } }
+        return questions.count { !it.answered && it.id !in answeredNow }
+    }
+
+    /** What the n-th clip shown for [q] is called right now: just a letter while a blind question is open. */
+    fun clipName(q: LabServer.Question, shown: Int): String {
+        val letter = ('A' + shown).toString()
+        val hidden = q.blind && !q.answered && q.id !in answeredNow
+        return if (hidden) letter else "$letter: ${q.clips[order[q.id]!![shown]]}"
+    }
+
+    fun playQuestionClip(q: LabServer.Question, shown: Int) = launch("Loading ${'A' + shown}") {
+        val s = server ?: error("Not connected")
+        val n = order[q.id]!![shown]
+        player.play(readWav(withContext(netThreads) { s.bytes("qclip", q.id, "$n.wav") }))
+        status = "Playing ${clipName(q, shown)}"
+    }
+
+    fun answer(q: LabServer.Question) = launch("Sending your answer") {
+        val s = server ?: error("Not connected")
+        val c = choice[q.id]
+        val t = reply[q.id]?.trim().orEmpty()
+        require(c != null || t.isNotEmpty()) { "Pick an option or type a reply" }
+        val shown = order[q.id]!!.map { q.clips[it] }
+        val body = buildJsonObject {
+            put("id", q.id); put("question", q.question)
+            c?.let { put("choice", it) }; put("text", t)
+            putJsonObject("order") { shown.forEachIndexed { i, label -> put(('A' + i).toString(), label) } }
+        }
+        withContext(netThreads) { s.post("answers", body) }
+        answeredNow[q.id] = listOfNotNull(c, t.ifEmpty { null }).joinToString(" · ")
+        status = "Answer sent" + if (q.blind) ": " + shown.mapIndexed { i, l -> "${'A' + i} was $l" }.joinToString(", ") else ""
     }
 
     fun cacheMb(): Long = (cache.walkTopDown().filter { it.isFile }.sumOf { it.length() }) / 1_000_000
@@ -144,7 +213,9 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
             weights.clear()
             weights[idx.defaultVoice] = 1f
         }
+        val nOpen = runCatching { loadQuestions() }.getOrDefault(0)
         status = "Connected: ${idx.voices.size} voices, ${idx.accents.size} accents" +
+            (if (nOpen > 0) ". $nOpen question(s) from Claude (Compare tab)" else "") +
             if (updateReady) ". An app update is ready (Server tab)" else ""
     }
 

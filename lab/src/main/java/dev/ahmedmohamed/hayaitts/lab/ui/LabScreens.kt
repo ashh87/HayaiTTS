@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -30,6 +32,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -47,13 +51,24 @@ private val TABS = listOf("Server", "Mixer", "Phrases", "Compare")
 private val GROUPS = listOf("mix" to "Mixes (bf_ha/)", "walk" to "Walks", "start" to "Start", "saved" to "Saved mixes", "stock" to "Stock voices")
 
 @Composable
-fun LabApp(vm: LabViewModel) {
+fun LabApp(vm: LabViewModel, openTab: MutableIntState) {
     var tab by rememberSaveable { mutableIntStateOf(if (vm.url.isBlank()) 0 else 1) }
+    LaunchedEffect(openTab.intValue) {
+        if (openTab.intValue >= 0) { tab = openTab.intValue; openTab.intValue = -1 }
+    }
+    val waiting = vm.openQuestions().size
     Scaffold(
         bottomBar = {
             NavigationBar {
                 TABS.forEachIndexed { i, name ->
-                    NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Text(name.take(1), fontWeight = FontWeight.Bold) }, label = { Text(name) })
+                    NavigationBarItem(
+                        selected = tab == i, onClick = { tab = i }, label = { Text(name) },
+                        icon = {
+                            BadgedBox(badge = { if (i == 3 && waiting > 0) Badge { Text("$waiting") } }) {
+                                Text(name.take(1), fontWeight = FontWeight.Bold)
+                            }
+                        },
+                    )
                 }
             }
         },
@@ -204,6 +219,34 @@ private fun CompareScreen(vm: LabViewModel) {
     val idx = vm.index
     LazyColumn(Modifier.fillMaxSize()) {
         item {
+            Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Questions from Claude", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                TextButton(onClick = vm::refreshQuestions, enabled = idx != null) { Text("Refresh") }
+            }
+        }
+        val open = vm.openQuestions()
+        val done = vm.questions.filter { it.answered || it.id in vm.answeredNow }
+        val current = open.firstOrNull()
+        if (current == null) item { Text("No open questions.", Modifier.padding(horizontal = 16.dp)) }
+        else item(key = "q_" + current.id) {
+            current.set?.let { set ->
+                val inSet = vm.questions.filter { it.set == set }
+                Text(
+                    "$set: ${inSet.count { it.answered || it.id in vm.answeredNow } + 1} of ${inSet.size}" +
+                        if (open.size > 1) " · ${open.size - 1} more waiting" else "",
+                    Modifier.padding(start = 16.dp), style = MaterialTheme.typography.labelMedium,
+                )
+            } ?: if (open.size > 1) Text("${open.size - 1} more waiting", Modifier.padding(start = 16.dp), style = MaterialTheme.typography.labelMedium) else Unit
+            QuestionCard(vm, current)
+        }
+        items(done, key = { "q_" + it.id }) { q ->
+            Text(
+                "✓ ${q.question}" + (vm.answeredNow[q.id]?.let { " — $it" } ?: ""),
+                Modifier.padding(horizontal = 16.dp, vertical = 2.dp), style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        item { HorizontalDivider(Modifier.padding(top = 8.dp)) }
+        item {
             Section("Pick two clips") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Blind (hide which is which until you vote)", Modifier.weight(1f))
@@ -238,6 +281,31 @@ private fun CompareScreen(vm: LabViewModel) {
             }
         }
         vm.folder?.let { f -> items(vm.serverItems(f), key = { it.key }) { ClipRow(vm, it) } }
+    }
+}
+
+@Composable
+private fun QuestionCard(vm: LabViewModel, q: dev.ahmedmohamed.hayaitts.lab.LabServer.Question) {
+    Section(q.question) {
+        if (q.blind) Text("Blind: the clips are shuffled and named after you answer.", style = MaterialTheme.typography.bodySmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            q.clips.indices.forEach { i -> OutlinedButton(onClick = { vm.playQuestionClip(q, i) }) { Text("▶ " + vm.clipName(q, i)) } }
+            TextButton(onClick = vm::stop) { Text("Stop") }
+        }
+        if (q.options.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                q.options.forEach { o ->
+                    FilterChip(vm.choice[q.id] == o, { if (vm.choice[q.id] == o) vm.choice.remove(q.id) else vm.choice[q.id] = o }, label = { Text(o) })
+                }
+            }
+        }
+        if (q.text) {
+            OutlinedTextField(vm.reply[q.id].orEmpty(), { vm.reply[q.id] = it }, Modifier.fillMaxWidth(), label = { Text("Your reply (optional)") })
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { vm.answer(q) }, enabled = vm.choice[q.id] != null || !vm.reply[q.id].isNullOrBlank()) { Text("Send") }
+            if (vm.openQuestions().size > 1) OutlinedButton(onClick = { vm.skip(q) }) { Text("Skip for now") }
+        }
     }
 }
 

@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)
+    implementation(libs.workmanager)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit4)

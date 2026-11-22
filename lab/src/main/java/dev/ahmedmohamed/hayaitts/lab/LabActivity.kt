@@ -1,11 +1,15 @@
 package dev.ahmedmohamed.hayaitts.lab
 
+import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -17,10 +21,18 @@ import dev.ahmedmohamed.hayaitts.lab.ui.LabApp
 
 class LabActivity : ComponentActivity() {
     private val vm: LabViewModel by viewModels()
+    private val openTab = mutableIntStateOf(-1) // a tab to switch to (from a notification), or -1
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openTab.intValue = intent.getIntExtra(Questions.EXTRA_TAB, -1)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        openTab.intValue = intent.getIntExtra(Questions.EXTRA_TAB, -1)
+        if (Build.VERSION.SDK_INT >= 33) registerForActivityResult(ActivityResultContracts.RequestPermission()) {}.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {
             val dark = isSystemInDarkTheme()
             val ctx = LocalContext.current
@@ -29,7 +41,7 @@ class LabActivity : ComponentActivity() {
                 dark -> darkColorScheme()
                 else -> lightColorScheme()
             }
-            MaterialTheme(colorScheme = scheme) { LabApp(vm) }
+            MaterialTheme(colorScheme = scheme) { LabApp(vm, openTab) }
         }
     }
 }

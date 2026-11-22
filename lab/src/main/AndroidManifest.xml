@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Self-update: installs a newer lab-debug.apk from the lab server (Android asks first). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- "New listening questions" (QuestionsWorker). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- The lab server is plain HTTP on the LAN or Tailscale (kokoro tools lab_server.py). -->
     <application
@@ -14,6 +16,7 @@
         <activity
             android:name=".LabActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

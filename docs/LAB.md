@@ -30,6 +30,13 @@ share its debug signing key, so they install over each other.
   count once played.
 - **Compare:** pick two clips, from the phone's last 20 renders or the server's clip folders. Choose blind if
   you like, play A and B, and vote. Votes are written to `out/lab_verdicts.jsonl` on the PC.
+  At the top are **questions from Claude**: listening checks written on the PC into `out/lab_questions.json`,
+  each with clips, answer options and an optional typed reply. Blind questions shuffle the clips and name them
+  after you answer. Answers are written to `out/lab_answers.jsonl`; answered questions stay ticked. The format is
+  in `lab_server.py`'s docstring. Questions come one at a time, in sets ("Glottal t grid: 2 of 6"), and you can
+  skip one for now. The Compare tab shows how many are waiting. The app checks every minute while it's open. In
+  the background it checks every 15 minutes (Android may wait longer) and posts a notification for new ones;
+  tapping it opens Compare.
 
 ## Checks
 `./gradlew :lab:testDebugUnitTest` runs these checks against `lab/src/test/resources/lab_fixture.json`, written by the

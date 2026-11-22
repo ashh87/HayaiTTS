@@ -41,6 +41,20 @@ class LabServer(base: String, private val cache: File) {
 
     @Serializable data class ClipFolder(val name: String, val root: Int, val files: List<String>)
 
+    /** A listening question from Claude (out/lab_questions.json); [clips] are the clips' labels. */
+    @Serializable
+    data class Question(
+        val id: String,
+        val question: String,
+        val clips: List<String>,
+        val blind: Boolean = false,
+        /** The set it belongs to ("Glottal t grid"), answered in order. */
+        val set: String? = null,
+        val options: List<String> = emptyList(),
+        val text: Boolean = true,
+        val answered: Boolean = false,
+    )
+
     private fun url(vararg segments: String) = base.newBuilder().apply { segments.forEach { addPathSegment(it) } }.build()
 
     private fun get(url: HttpUrl) = http.newCall(Request.Builder().url(url).build()).execute().also {
@@ -48,6 +62,8 @@ class LabServer(base: String, private val cache: File) {
     }
 
     fun index(): Index = get(url("index.json")).use { JSON.decodeFromString(it.body!!.string()) }
+
+    fun questions(): List<Question> = get(url("questions.json")).use { JSON.decodeFromString(it.body!!.string()) }
 
     fun bytes(vararg segments: String): ByteArray = get(url(*segments)).use { it.body!!.bytes() }
 
