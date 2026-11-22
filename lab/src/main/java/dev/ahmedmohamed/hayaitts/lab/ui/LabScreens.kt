@@ -76,8 +76,11 @@ fun LabApp(vm: LabViewModel, openTab: MutableIntState) {
         Column(Modifier.padding(pad).fillMaxSize()) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(vm.status, style = MaterialTheme.typography.bodySmall, maxLines = 3)
-                vm.progress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) }
-                    ?: if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp)) else Unit
+                vm.downloads.forEach { (name, done) ->
+                    Text("$name ${(done * 100).toInt()} %", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.labelSmall)
+                    LinearProgressIndicator(progress = { done }, modifier = Modifier.fillMaxWidth())
+                }
+                if (vm.downloads.isEmpty() && vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp))
             }
             HorizontalDivider()
             when (tab) {
@@ -103,7 +106,7 @@ private fun ServerScreen(vm: LabViewModel) {
     Section("Lab server (kokoro tools lab_server.py)") {
         OutlinedTextField(vm.url, { vm.url = it }, Modifier.fillMaxWidth(), label = { Text("URL, e.g. 100.76.99.5:8770") }, singleLine = true)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = vm::connect, enabled = vm.url.isNotBlank()) { Text("Connect") }
+            Button(onClick = { vm.connect() }, enabled = vm.url.isNotBlank()) { Text("Connect") }
             OutlinedButton(onClick = vm::clearCache) { Text("Clear cache") }
         }
         val idx = vm.index
@@ -120,6 +123,22 @@ private fun ServerScreen(vm: LabViewModel) {
                 Modifier.padding(top = 12.dp),
             )
             if (vm.updateReady) Button(onClick = vm::update) { Text("Update") }
+        }
+        idx?.mainApp?.let { app ->
+            val ready = remember(vm.index, vm.status) { vm.mainUpdateReady() }
+            Text(
+                if (ready) "HayaiTTS: a newer build is on the server (${app.size / 1_000_000} MB)"
+                else "HayaiTTS is up to date with the server's build.",
+                Modifier.padding(top = 12.dp),
+            )
+            if (ready) Button(onClick = vm::updateMain) { Text("Install HayaiTTS") }
+        }
+        if (!idx?.bundles.isNullOrEmpty()) Text("Voice bundles for HayaiTTS", Modifier.padding(top = 12.dp))
+        idx?.bundles?.forEach { b ->
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { vm.sendBundle(b) }) { Text("Send") }
+                Text("${b.name} (${b.size / 1_000_000} MB)", Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+            }
         }
     }
 }

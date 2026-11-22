@@ -16,10 +16,13 @@ class UpdateReceiver : BroadcastReceiver() {
                 else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_INTENT)
                 confirm?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
-            PackageInstaller.STATUS_SUCCESS -> Unit // the app restarts as the new version
-            else -> Toast.makeText(
-                context, "Update failed ($status): ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}", Toast.LENGTH_LONG,
-            ).show()
+            // the lab itself restarts as the new version; for HayaiTTS, tell the open lab
+            PackageInstaller.STATUS_SUCCESS -> Update.result = "HayaiTTS updated"
+            else -> {
+                val why = "Update failed ($status): ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}"
+                Update.result = why
+                Toast.makeText(context, why, Toast.LENGTH_LONG).show()
+            }
         }
     }
 }

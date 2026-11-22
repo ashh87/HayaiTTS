@@ -7,12 +7,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
@@ -44,8 +46,8 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
     var url by mutableStateOf(prefs.getString("url", "").orEmpty())
     var status by mutableStateOf("Not connected")
         private set
-    var progress by mutableStateOf<Float?>(null)
-        private set
+    /** Downloads in progress: file name -> fraction done, one bar each. */
+    val downloads = mutableStateMapOf<String, Float>()
     var busy by mutableStateOf(false)
         private set
     var index by mutableStateOf<LabServer.Index?>(null)
@@ -109,8 +111,9 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
-        if (url.isNotBlank()) connect()
+        if (url.isNotBlank()) connect(auto = true)
         Questions.schedule(app)
+        viewModelScope.launch { snapshotFlow { Update.result }.filterNotNull().collect { status = it; Update.result = null } }
         viewModelScope.launch {
             while (true) { // while the app is open, look for new questions every minute
                 delay(60_000)
@@ -170,14 +173,19 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
         status = "Cache cleared; connect again"
     }
 
-    fun connect() = launch("Connecting") {
+    /** [auto]: on opening the app, which only uses a model already on the phone (a new one waits for Connect). */
+    fun connect(auto: Boolean = false) = launch("Connecting") {
         prefs.edit().putString("url", url.trim()).apply()
         val s = LabServer(url, cache)
         val idx = withContext(netThreads) { s.index() }
         // checked first, so a broken model can't block the update that fixes it
         val mine = installedSha ?: withContext(netThreads) { Update.installedSha256(getApplication()) }.also { installedSha = it }
         updateReady = idx.app?.sha256.let { it != null && it != mine }
-        if (updateReady) { server = s; index = idx }
+        if (updateReady) { // update first: the new build may want a different model anyway
+            server = s; index = idx
+            status = "App update ready: tap Update below, then Connect"
+            return@launch
+        }
         status = "Fetching the parts"
         val tokens: String
         val words: File
@@ -189,10 +197,18 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
             idx.accents.forEach { s.file("accent_$it.json", null, "accent", "$it.json") }
         }
         status = "Model (${idx.model.size / 1_000_000} MB, fetched once)"
-        val model = withContext(netThreads) {
-            s.file("model.onnx", "${idx.model.size}-${idx.model.mtime}", "model.onnx") { progress = it }
+        val stamp = "${idx.model.size}-${idx.model.mtime}"
+        // a worker with a foreground notification, so the download carries on when you switch apps
+        val cached = withContext(netThreads) { s.cached("model.onnx", stamp) }
+        if (cached == null && auto) {
+            server = s
+            val nOpen = runCatching { loadQuestions() }.getOrDefault(0)
+            status = "A new model is on the server (${idx.model.size / 1_000_000} MB): tap Connect to download it" +
+                if (nOpen > 0) ". $nOpen question(s) from Claude (Compare tab)" else ""
+            return@launch
         }
-        progress = null
+        val model = cached
+            ?: download("model.onnx") { ModelDownload.fetch(getApplication(), url, "model.onnx", stamp, "model.onnx", progress = it) }
         status = "Loading the model"
         withContext(synthThread) {
             kokoro?.close()
@@ -219,12 +235,33 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
             if (updateReady) ". An app update is ready (Server tab)" else ""
     }
 
-    fun update() = launch("Downloading the update") {
+    fun update() = install("lab.apk", index?.app)
+
+    /** HayaiTTS is older than the server's build (or not installed). */
+    fun mainUpdateReady(): Boolean =
+        index?.mainApp?.let { m -> Update.mainInstalledAt(getApplication()).let { it == null || it < m.mtime } } ?: false
+
+    fun updateMain() = install("main.apk", index?.mainApp)
+
+    /** Downloads [b] (in the background, like the model) and opens it in HayaiTTS's import screen. */
+    fun sendBundle(b: LabServer.Bundle) = launch("Downloading ${b.name}", alone = false) { // alongside other tasks, not replacing them
+        val f = download("${b.name}.tar") { ModelDownload.fetch(getApplication(), url, "${b.name}.tar", "${b.size}-${b.mtime}", "bundle", "${b.name}.tar", progress = it) }
+        // shortcut: if the download finished while the lab was in the background, Android may block this; tap Send again (it's cached)
+        Update.sendToMain(getApplication(), f)
+        status = "Opened ${b.name} in HayaiTTS: finish the import there"
+    }
+
+    private fun install(name: String, info: LabServer.Stamp?) = launch("Downloading $name") {
         val s = server ?: error("Not connected")
-        val apk = withContext(netThreads) { s.file("lab.apk", null, "lab.apk") { progress = it } }
-        progress = null
-        val want = index?.app?.sha256
-        check(want == null || withContext(netThreads) { Update.sha256(apk) } == want) { "the download doesn't match the server's hash; try again" }
+        val stamp = info?.let { "${it.size}-${it.mtime}" } ?: error("The server has no $name")
+        // a background worker, like the model; a finished download is reused
+        val apk = withContext(netThreads) { s.cached(name, stamp) }
+            ?: download(name) { ModelDownload.fetch(getApplication(), url, name, stamp, name, progress = it) }
+        val want = info.sha256
+        if (want != null && withContext(netThreads) { Update.sha256(apk) } != want) {
+            apk.delete()
+            error("the download doesn't match the server's hash; try again")
+        }
         Update.install(getApplication(), apk)
         status = "Confirm the update in Android's installer"
     }
@@ -385,10 +422,20 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
         status = "Stopped"
     }
 
-    /** Runs [work] as the one current task (a new one replaces it), with errors shown in [status]. */
-    private fun launch(what: String, work: suspend () -> Unit) {
-        job?.cancel()
-        job = viewModelScope.launch {
+    /** Runs [get] with its own progress bar under [name]. */
+    private suspend fun <T> download(name: String, get: suspend (progress: (Float) -> Unit) -> T): T {
+        downloads[name] = 0f
+        try {
+            return get { downloads[name] = it }
+        } finally {
+            downloads.remove(name)
+        }
+    }
+
+    /** Runs [work] as the one current task (a new one replaces it; with [alone] false, alongside it), with errors shown in [status]. */
+    private fun launch(what: String, alone: Boolean = true, work: suspend () -> Unit) {
+        if (alone) job?.cancel()
+        val j = viewModelScope.launch {
             busy = true
             status = "$what…"
             try {
@@ -397,11 +444,11 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Throwable) {
                 status = "$what failed: ${e.message ?: e.javaClass.simpleName}"
-                progress = null
             } finally {
                 busy = false
             }
         }
+        if (alone) job = j
     }
 
     override fun onCleared() {

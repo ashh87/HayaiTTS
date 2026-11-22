@@ -1,5 +1,6 @@
 package dev.ahmedmohamed.hayaitts.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,6 +42,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // a .tar sent to us ("Open with", Kokoro Lab): once, not again after rotation
+        val importUri = intent.takeIf { savedInstanceState == null && it.action == Intent.ACTION_VIEW && it.data?.scheme == "content" }?.data
         setContent {
             HayaiTtsTheme {
                 Surface {
@@ -70,6 +73,9 @@ class MainActivity : ComponentActivity() {
                             lifecycleScope.launch { onboardingPrefs.setComplete(true) }
                         },
                     )
+                    if (importUri != null && resolved) {
+                        LaunchedEffect(Unit) { navController.navigate(Routes.customImport(importUri.toString())) }
+                    }
 
                     VoiceQuickSwitcher(
                         visible = quickSwitchOpen,

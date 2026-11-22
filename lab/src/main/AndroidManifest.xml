@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Self-update: installs a newer lab-debug.apk from the lab server (Android asks first). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- "New listening questions" (QuestionsWorker). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The model download keeps going in the background (ModelDownload). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- To see whether HayaiTTS is installed, and how old it is. -->
+    <queries>
+        <package android:name="dev.ahmedmohamed.hayaitts" />
+    </queries>
 
     <!-- The lab server is plain HTTP on the LAN or Tailscale (kokoro tools lab_server.py). -->
     <application
@@ -24,5 +33,17 @@
             </intent-filter>
         </activity>
         <receiver android:name=".UpdateReceiver" android:exported="false" />
+        <!-- Hands one voice bundle to HayaiTTS's import screen (read-only grant per file). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
     </application>
 </manifest>

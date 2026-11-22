@@ -51,6 +51,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="hayaitts" android:host="downloads" />
             </intent-filter>
+            <!-- A voice bundle sent by Kokoro Lab or opened from a file manager. It only
+                 opens the import wizard (same checks and confirmation as picking the
+                 file yourself); content:// only, with a read grant for that one file. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/x-tar" />
+            </intent-filter>
         </activity>
 
         <activity-alias

@@ -33,7 +33,13 @@ class LabServer(base: String, private val cache: File) {
         val clips: List<ClipFolder>,
         /** The lab app as last built on the PC, for the self-update. */
         val app: Stamp? = null,
+        /** The HayaiTTS app as last built on the PC, which the lab can install. */
+        @SerialName("main_app") val mainApp: Stamp? = null,
+        /** Voice bundles (build_package.py) the lab can hand to HayaiTTS. */
+        val bundles: List<Bundle> = emptyList(),
     )
+
+    @Serializable data class Bundle(val name: String, val size: Long, val mtime: Long)
 
     @Serializable data class Stamp(val size: Long, val mtime: Long, val sha256: String? = null)
 
@@ -67,14 +73,18 @@ class LabServer(base: String, private val cache: File) {
 
     fun bytes(vararg segments: String): ByteArray = get(url(*segments)).use { it.body!!.bytes() }
 
+    /** The cached file [name] if its stamp is [stamp], else null. */
+    fun cached(name: String, stamp: String): File? =
+        File(cache, name).takeIf { it.isFile && File(cache, "$name.stamp").let { s -> s.isFile && s.readText() == stamp } }
+
     /**
      * [segments]' file, from the cache when its [stamp] (anything that changes with the file) matches,
      * else downloaded; [progress] gets the fraction done.
      */
     fun file(name: String, stamp: String?, vararg segments: String, progress: (Float) -> Unit = {}): File {
+        if (stamp != null) cached(name, stamp)?.let { return it }
         val dest = File(cache, name)
         val stampFile = File(cache, "$name.stamp")
-        if (stamp != null && dest.isFile && stampFile.isFile && stampFile.readText() == stamp) return dest
         cache.mkdirs()
         val tmp = File(cache, "$name.part")
         get(url(*segments)).use { r ->
