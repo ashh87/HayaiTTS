@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "HayaiTTS"
-include(":app")
+include(":app", ":speech", ":lab")

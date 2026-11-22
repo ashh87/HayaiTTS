@@ -152,7 +152,7 @@ android {
     // inflating ~28 MB into RAM on every cold start.
     androidResources {
         noCompress += "onnx"
-        // misaki tables are memory-mapped straight out of the APK (PackedTable.asset).
+        // misaki tables (from :speech) are memory-mapped straight out of the APK (PackedTable.asset).
         noCompress += "kv"
     }
 }
@@ -217,7 +217,9 @@ dependencies {
     // v2.x dropped espeak-ng (now GPL-free), so espeak voices are phonemized
     // in-app with piper-phonemize (GPL-3, same author; ships espeak-ng-data as assets).
     implementation(files("libs/sherpa-onnx-2.0.2.aar"))
-    implementation(files("libs/piper-phonemize-1.5.9.aar"))
+    implementation(files("../libs/piper-phonemize-1.5.9.aar"))
+    // misaki G2P, markup and accent rules, shared with the lab app (:lab)
+    implementation(project(":speech"))
 
     testImplementation(libs.junit4)
     testImplementation(libs.coroutines.test)

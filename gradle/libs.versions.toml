@@ -30,6 +30,8 @@ okhttp = "4.12.0"
 datastore = "1.2.1"
 workManager = "2.11.2"
 kermit = "2.1.0"
+# ONNX Runtime for the lab app (:lab), which runs model.onnx itself to mix voices live.
+onnxruntime = "1.20.0"
 
 # tar.bz2 extraction for sherpa-onnx voice bundles. Apache Commons Compress
 # bundles its own BZip2 + TAR codecs so we do not need to shell out or pull
@@ -100,6 +102,8 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime" }
+onnxruntime-jvm = { module = "com.microsoft.onnxruntime:onnxruntime", version.ref = "onnxruntime" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 
 # AAR coordinate is not used directly — app/build.gradle.kts pulls
@@ -109,6 +113,7 @@ konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
