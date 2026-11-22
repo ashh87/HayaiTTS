@@ -24,7 +24,7 @@ class LabServer(base: String, private val cache: File) {
         val model: Stamp,
         val voices: List<Voice>,
         @SerialName("default_voice") val defaultVoice: String,
-        /** The voice in the bundle HayaiTTS has installed (build/bf_ha-expressive), if it is one of [voices]. */
+        /** The voice in the bundle HayaiTTS has installed (build/bf_harriet-expressive), if it is one of [voices]. */
         val installed: String? = null,
         val accents: List<String>,
         val presets: Map<String, List<Double>>,

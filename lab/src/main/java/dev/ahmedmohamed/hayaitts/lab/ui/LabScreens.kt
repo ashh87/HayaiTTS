@@ -48,7 +48,7 @@ import dev.ahmedmohamed.hayaitts.lab.LabViewModel
 import kotlin.math.roundToInt
 
 private val TABS = listOf("Server", "Mixer", "Phrases", "Compare")
-private val GROUPS = listOf("mix" to "Mixes (bf_ha/)", "walk" to "Walks", "start" to "Start", "saved" to "Saved mixes", "stock" to "Stock voices")
+private val GROUPS = listOf("mix" to "Mixes (bf_harriet/)", "walk" to "Walks", "start" to "Start", "saved" to "Saved mixes", "stock" to "Stock voices")
 
 @Composable
 fun LabApp(vm: LabViewModel, openTab: MutableIntState) {

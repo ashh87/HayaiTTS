@@ -22,7 +22,7 @@ you to confirm. The first time, Android also asks you to allow installs from Kok
 share its debug signing key, so they install over each other.
 
 ## Screens
-- **Mixer:** one slider per voice: walks, `bf_ha/` mixes, saved mixes and a few stock voices. Weights are
+- **Mixer:** one slider per voice: walks, `bf_harriet/` mixes, saved mixes and a few stock voices. Weights are
   normalised. You also get an emotion, the text, Play, **Save on PC** (written to `out/gmix_….pt`) and **Creak**
   (fry pulses per line: under ~3 is clean, 7+ is clicky).
 - **Phrases:** `problem_phrases.txt`, played with the mixer's voice and an accent, with the rules switched on or
@@ -41,5 +41,5 @@ share its debug signing key, so they install over each other.
 ## Checks
 `./gradlew :lab:testDebugUnitTest` runs these checks against `lab/src/test/resources/lab_fixture.json`, written by the
 kokoro tools' `lab_fixture.py`:
-- ONNX Runtime durations must equal torch's. This needs `../kokoro/build/bf_ha-expressive`, or `KOKORO_BUNDLE`.
+- ONNX Runtime durations must equal torch's. This needs `../kokoro/build/bf_harriet-expressive`, or `KOKORO_BUNDLE`.
 - The creak counts must equal `creak.py`'s.
