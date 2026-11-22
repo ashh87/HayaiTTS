@@ -1,5 +1,5 @@
 {
-  "about": "Scottish (Edinburgh-ish), from the ROADMAP step 1 listening test: rhotic with a tapped r, one open vowel, LOT=THOUGHT, pure FACE/GOAT, no FOOT/GOOSE contrast.",
+  "about": "Scottish (Edinburgh-ish), from the ROADMAP step 1 listening test: rhotic with a tapped r, one open vowel, LOT=THOUGHT, pure FACE, GOAT as Kokoro's oʊ (O; heard best, 2026-11-22), no FOOT/GOOSE contrast.",
   "rules": [
     [
       "ʊəR",
@@ -59,15 +59,7 @@
     ],
     [
       "Q",
-      "o"
-    ],
-    [
-      "([aeiouɪɛəʌʊɒɔɑɜAIQWY][^#]*[^aeiouɪɛəʌʊɒɔɑɜAIQWYˈˌː#])i(?=#)",
-      "$1e"
-    ],
-    [
-      "iː",
-      "i"
+      "O"
     ],
     [
       "uː",
