@@ -35,12 +35,11 @@ class AccentRules(json: String, private val lexsets: PackedTable?) {
             val n = (i + 1 until tokens.size).firstOrNull { ps[it].isNotEmpty() }
             val ctx = context(n?.let { tokens[it].text }, n?.let { ps[it] })
             val w = tk.text.lowercase()
-            var out = words[w] ?: run {
+            val out = words[w] ?: run {
                 var s = marked(tk.text, ps[i]) + ctx
                 for ((re, rep) in rules) s = re.replace(s, rep)
                 s.substringBefore('#')
             }
-            if (ctx == "#." && out.endsWith(VELAR_X)) out = out.dropLast(1) + VELAR_FALLBACK
             ps[i] = out.filterNot { it in MARKS }
         }
     }
@@ -69,8 +68,6 @@ class AccentRules(json: String, private val lexsets: PackedTable?) {
         private const val MARKS = "BR"
         private const val STRESS = "ˈˌ"
         private const val SENTENCE_END = ".!?"
-        private const val VELAR_X = "" // Markup's velar fricative; before a sentence end it sounds like "hee", so k
-        private const val VELAR_FALLBACK = "k"
         private val SUFFIXES = listOf("'s", "s", "es", "ed", "d", "ing")
 
         /** [ann]'s marks put into [ps] when ps starts with ann's sounds (stress may differ), else null. */
