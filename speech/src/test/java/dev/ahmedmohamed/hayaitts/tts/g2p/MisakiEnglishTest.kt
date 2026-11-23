@@ -115,6 +115,9 @@ class MisakiEnglishTest {
             "Say \uE000[Niamh](/nˈiːv/)\uE001 twice." to "sˈA \uE000nˈiːv\uE001 twˈIs.",
             "Put it back where you found it, \uE002\uE002 right now!\uE003\uE003 Thank you." to
                 "pˌʊt ɪt bˈak wˌɛː juː fˈWnd ɪt, \uE002\uE002ɹˈIt nˈW! \uE003\uE003θˈaŋk juː.",
+            // a level marker then a space before an emphasised word: "right" kept its emphasis (found by prosody_tuner.py)
+            "Put it back where you found it, \uE002\uE002 \uE000\uE000right\uE001\uE001 \uE000\uE000now\uE001\uE001!" to
+                "pˌʊt ɪt bˈak wˌɛː juː fˈWnd ɪt, \uE000\uE000\uE002\uE002ɹˈIt\uE001\uE001 \uE000\uE000nˈW\uE001\uE001!",
             "It cost \uE000£1,200\uE001 in 1984." to
                 "ˌɪt kˈɒst \uE000wˈʌn θˈWzᵊnd tˈuː hˈʌndɹəd pˈWndz\uE001 ɪn nˌIntˈiːn ˈAti fˈɔː.",
             "\uE000Don't\uE001 you \uE000dare\uE001, it's \uE000not\uE001 yours." to

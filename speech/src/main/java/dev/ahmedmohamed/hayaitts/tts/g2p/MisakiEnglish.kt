@@ -820,7 +820,14 @@ class MisakiEnglish(
             if (pre.text.none { it in MARKERS }) return pre
             val clean = StringBuilder()
             val marks = mutableListOf<Pair<Int, Char>>()
-            for (c in pre.text) if (c in MARKERS) marks += clean.length to c else clean.append(c)
+            for (c in pre.text) {
+                when {
+                    c in MARKERS -> marks += clean.length to c
+                    // the tokens don't count a doubled or leading space ("it, \uE002 \uE000right"): offsets mustn't either
+                    c == ' ' && (clean.isEmpty() || clean.last() == ' ') -> {}
+                    else -> clean.append(c)
+                }
+            }
             val kept = mutableListOf<String>()
             val remap = HashMap<Int, Int>()
             for ((i, w) in pre.words.withIndex()) {

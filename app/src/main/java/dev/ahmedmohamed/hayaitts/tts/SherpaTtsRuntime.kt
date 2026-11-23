@@ -19,6 +19,7 @@ import dev.ahmedmohamed.hayaitts.data.playground.PitchResampler
 import dev.ahmedmohamed.hayaitts.data.voices.VoiceRepositoryImpl
 import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.ModelFamily
+import dev.ahmedmohamed.hayaitts.domain.repo.NO_ACCENT
 import dev.ahmedmohamed.hayaitts.domain.repo.SettingsRepository
 import dev.ahmedmohamed.hayaitts.tts.g2p.MisakiAssets
 import dev.ahmedmohamed.hayaitts.tts.markup.ExpressiveRows
@@ -55,10 +56,11 @@ class SherpaTtsRuntime private constructor(
     )
 
     /**
-     * [frontend] is null when sherpa-onnx reads the text itself (lexicon / character models).
+     * [frontends] gives a speaker's frontend (its accent), null when sherpa-onnx reads the text
+     * itself (lexicon / character models).
      * [expressive] is set for voices built with the expressive Kokoro model (expressive.txt).
      */
-    private class Engine(val tts: OfflineTts, val frontend: PhonemeFrontend?, val expressive: ExpressiveRows? = null) {
+    private class Engine(val tts: OfflineTts, val frontends: (Int) -> PhonemeFrontend?, val expressive: ExpressiveRows? = null) {
         /**
          * [onChunk] gets each sentence's audio as soon as it exists; returning 0 stops. It is
          * driven from here, not through sherpa's native callback: that JNI looks the lambda up as
@@ -66,6 +68,7 @@ class SherpaTtsRuntime private constructor(
          * pending NoSuchMethodError aborts the process under CheckJNI.
          */
         fun generate(text: String, sid: Int, speed: Float, onChunk: ((FloatArray) -> Int)? = null): GeneratedAudio {
+            val frontend = frontends(sid)
             val phonemes = frontend?.phonemize(text)?.takeIf { it.isNotEmpty() }
             if (phonemes == null) {
                 // shortcut: lexicon/character models play only once the whole text is done; stream them if they get used for long text.
@@ -208,7 +211,7 @@ class SherpaTtsRuntime private constructor(
      * [text] may carry markup (docs/MARKUP.md): [sad], [pause=800ms], <speak> SSML, …
      * Each segment is generated sentence by sentence and handed to [onChunk] as it lands
      * (returning 0 stops); pauses arrive as silent chunks. Emotion and pitch pick a row of
-     * an expressive voice when [sid] is its base speaker (0); other voices still get pauses,
+     * an expressive voice when [sid] is a voice's base speaker; other voices still get pauses,
      * rate and volume. Without [onChunk] the whole result is returned instead.
      * [systemPitch] is Android's pitch setting (1.0 = normal): a real pitch shift on an expressive
      * voice (the nearest pitch row, at the same speed), the [pitch] resampler on others.
@@ -237,7 +240,7 @@ class SherpaTtsRuntime private constructor(
         }
         for (seg in Markup.parse(text)) {
             if (seg.text.isNotBlank()) {
-                val rows = engine.expressive?.takeIf { sid == 0 }
+                val rows = engine.expressive?.forBase(sid)
                 val row = rows?.rowFor(seg.emotion, seg.intensity, seg.pitch + systemSt)
                 val segSid = row?.sid ?: sid
                 // Span markers only mean something to the expressive model; others would read them as junk.
@@ -496,8 +499,46 @@ class SherpaTtsRuntime private constructor(
         val config = buildConfig(family, voiceDir, kokoroLanguage, lengthScale, noiseScale, noiseScaleW, useNnapi, numThreads, maxNumSentences)
         val tts = OfflineTts(assetManager = null, config = config)
         log.i { "OfflineTts ready for ${voice.voiceId} (sampleRate=${tts.sampleRate()})" }
-        return Engine(tts, frontendFor(family, voiceDir, voice, kokoroLanguage, tts), ExpressiveRows.read(voiceDir))
+        return Engine(tts, frontendsFor(family, voiceDir, voice, kokoroLanguage, tts), ExpressiveRows.read(voiceDir))
     }
+
+    /**
+     * Each speaker's frontend, one per accent file. A bundle of several voices maps every sid
+     * to its accent in voice_accents.txt ("sid name", "-" for none; build_package.py --with);
+     * a single voice has accent.json. The default-accent setting overrides both when this
+     * bundle ships that accent.
+     */
+    private fun frontendsFor(
+        family: ModelFamily,
+        dir: File,
+        voice: InstalledVoice,
+        kokoroLanguage: String,
+        tts: OfflineTts,
+    ): (Int) -> PhonemeFrontend? {
+        fun named(name: String): File? =
+            if (name == NO_ACCENT || !ACCENT_NAME.matches(name)) null else File(dir, "accent-$name.json").takeIf { it.isFile }
+        val bySid: Map<Int, String> = File(dir, VOICE_ACCENTS_FILE).takeIf { it.isFile }?.readLines().orEmpty()
+            .mapNotNull { line ->
+                val p = line.substringBefore('#').trim().split(Regex("\\s+"))
+                p.getOrNull(0)?.toIntOrNull()?.takeIf { p.size == 2 }?.let { it to p[1] }
+            }.toMap()
+        val cache = HashMap<String, PhonemeFrontend?>()
+        return { sid ->
+            val own = bySid[sid]?.let(::named) ?: File(dir, ACCENT_FILE).takeIf { bySid.isEmpty() && it.isFile }
+            val file = when (val d = defaultAccent()) {
+                null -> own
+                NO_ACCENT -> null
+                else -> named(d) ?: own
+            }
+            synchronized(cache) {
+                cache.getOrPut(file?.name.orEmpty()) { frontendFor(family, dir, voice, kokoroLanguage, tts, file) }
+            }
+        }
+    }
+
+    private fun defaultAccent(): String? = runCatching {
+        runBlocking { GlobalContext.get().get<SettingsRepository>().defaultAccent.first() }
+    }.getOrNull()
 
     /** Matches what sherpa-onnx 1.x did internally: espeak wherever the bundle shipped espeak-ng-data. */
     private fun frontendFor(
@@ -506,6 +547,7 @@ class SherpaTtsRuntime private constructor(
         voice: InstalledVoice,
         kokoroLanguage: String,
         tts: OfflineTts,
+        accentFile: File?,
     ): PhonemeFrontend? {
         // Kokoro always needs phonemes from us (sherpa 2 has no espeak) and the espeak data
         // comes from the APK, so single-voice bundles may leave espeak-ng-data out. For the
@@ -524,7 +566,7 @@ class SherpaTtsRuntime private constructor(
                     // espeak-ng's British voice is plain "en"; "en-gb" is not a voice name.
                     val espeakVoice = if (british) "en" else "en-us"
                     MisakiFrontend(
-                        MisakiAssets.english(context, british, File(dir, CUSTOM_WORDS_FILE), File(dir, ACCENT_FILE)) {
+                        MisakiAssets.english(context, british, File(dir, CUSTOM_WORDS_FILE), accentFile) {
                             Espeak.phonemize(context, it, espeakVoice).joinToString(" ")
                         },
                     )
@@ -890,6 +932,8 @@ class SherpaTtsRuntime private constructor(
         /** Optional per-bundle custom words, misaki phonemes: `word<whitespace>phonemes`, `#` comments. */
         private const val CUSTOM_WORDS_FILE = "pronunciations.tsv"
         private const val ACCENT_FILE = "accent.json" // accents/<name>.json from the kokoro tools (AccentRules)
+        private const val VOICE_ACCENTS_FILE = "voice_accents.txt"
+        private val ACCENT_NAME = Regex("[a-z0-9_]+") // a file name part, never a path
         private val KOKORO_ESPEAK_VOICES = mapOf("pt" to "pt-br")
         private val ZIPVOICE_ENCODER_CANDIDATES = listOf("encoder.int8.onnx", "encoder.onnx")
         private val ZIPVOICE_DECODER_CANDIDATES = listOf("decoder.int8.onnx", "decoder.onnx")

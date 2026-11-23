@@ -7,10 +7,14 @@ import kotlin.math.abs
  * A voice's `expressive.txt` (written by the kokoro tools' build_package.py --expressive):
  * one "sid emotion intensity% pitch_semitones" line per voices.bin row, rendered by the
  * expressive Kokoro model. Rows are fixed, so a segment gets the nearest one.
+ * A bundle of several voices adds a first column, the voice's base sid (its plain row).
  */
 class ExpressiveRows(private val rows: List<Row>) {
 
-    data class Row(val sid: Int, val emotion: String?, val intensity: Int, val pitch: Int)
+    data class Row(val sid: Int, val emotion: String?, val intensity: Int, val pitch: Int, val base: Int = 0)
+
+    /** This voice's rows when [sid] is a voice's base speaker, else null. */
+    fun forBase(sid: Int): ExpressiveRows? = rows.filter { it.base == sid }.takeIf { it.isNotEmpty() }?.let(::ExpressiveRows)
 
     /** Speaker id for this emotion/intensity/pitch; an emotion under 25 % counts as neutral. */
     fun sidFor(emotion: String?, intensity: Double, pitch: Double): Int? = rowFor(emotion, intensity, pitch)?.sid
@@ -38,12 +42,14 @@ class ExpressiveRows(private val rows: List<Row>) {
         fun read(dir: File): ExpressiveRows? {
             val f = File(dir, FILE).takeIf { it.isFile } ?: return null
             val rows = f.readLines().mapNotNull { line ->
-                val p = line.substringBefore('#').trim().split(Regex("\\s+"))
+                val all = line.substringBefore('#').trim().split(Regex("\\s+"))
+                val base = if (all.size == 5) all[0].toIntOrNull() ?: return@mapNotNull null else 0
+                val p = if (all.size == 5) all.drop(1) else all
                 if (p.size != 4) return@mapNotNull null
                 val sid = p[0].toIntOrNull() ?: return@mapNotNull null
                 val pct = p[2].toIntOrNull() ?: return@mapNotNull null
                 val pitch = p[3].toIntOrNull() ?: return@mapNotNull null
-                Row(sid, p[1].takeIf { it != "neutral" }, pct, pitch)
+                Row(sid, p[1].takeIf { it != "neutral" }, pct, pitch, base)
             }
             return ExpressiveRows(rows).takeIf { rows.isNotEmpty() }
         }

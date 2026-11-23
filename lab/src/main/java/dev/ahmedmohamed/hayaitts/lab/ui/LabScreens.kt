@@ -1,6 +1,8 @@
 package dev.ahmedmohamed.hayaitts.lab.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -102,7 +104,7 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
 }
 
 @Composable
-private fun ServerScreen(vm: LabViewModel) {
+private fun ServerScreen(vm: LabViewModel) = Column(Modifier.verticalScroll(rememberScrollState())) {
     Section("Lab server (kokoro tools lab_server.py)") {
         OutlinedTextField(vm.url, { vm.url = it }, Modifier.fillMaxWidth(), label = { Text("URL, e.g. 100.76.99.5:8770") }, singleLine = true)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

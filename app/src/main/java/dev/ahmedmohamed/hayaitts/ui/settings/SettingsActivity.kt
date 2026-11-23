@@ -2,6 +2,7 @@
 
 package dev.ahmedmohamed.hayaitts.ui.settings
 
+import dev.ahmedmohamed.hayaitts.domain.repo.NO_ACCENT
 import android.content.Intent
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Language
@@ -153,6 +154,9 @@ fun SettingsScreen(
     var threadsDialogOpen by remember { mutableStateOf(false) }
     var maxSentencesDialogOpen by remember { mutableStateOf(false) }
     var languagePickerOpen by remember { mutableStateOf(false) }
+    var accentDialogOpen by remember { mutableStateOf(false) }
+    val defaultAccent by viewModel.defaultAccent.collectAsStateWithLifecycle()
+    val accents by viewModel.accents.collectAsStateWithLifecycle()
     var searchQuery by remember { mutableStateOf("") }
     val allowedLanguages by viewModel.allowedLanguages.collectAsStateWithLifecycle()
     val catalogLanguages by viewModel.catalogLanguages.collectAsStateWithLifecycle()
@@ -174,6 +178,8 @@ fun SettingsScreen(
     val labelDefaultsEmpty = stringResource(R.string.settings_defaults_empty)
     val labelAllowedLanguages = stringResource(R.string.settings_allowed_languages) +
         " " + stringResource(R.string.settings_allowed_languages_subtitle)
+    val labelAccent = stringResource(R.string.settings_default_accent) +
+        " " + stringResource(R.string.settings_default_accent_subtitle)
 
     val labelStorageSection = stringResource(R.string.settings_section_storage)
     val labelTotalSize = stringResource(
@@ -216,6 +222,7 @@ fun SettingsScreen(
     val showDefaultsSection = matches(
         labelDefaultsEmpty,
         labelAllowedLanguages,
+        labelAccent,
         *state.installedLocales.toTypedArray(),
     )
     val showStorageSection = matches(labelTotalSize, labelClearCache)
@@ -374,6 +381,14 @@ fun SettingsScreen(
                         )
                     },
                     modifier = Modifier.clickableRow { languagePickerOpen = true },
+                )
+            }
+            if (showDefaultsSection && accents.isNotEmpty() && matches(labelAccent)) item("default_accent") {
+                ListItem(
+                    leadingContent = { Icon(Icons.Outlined.Tune, contentDescription = null) },
+                    headlineContent = { Text(stringResource(R.string.settings_default_accent)) },
+                    supportingContent = { Text(accentLabel(defaultAccent)) },
+                    modifier = Modifier.clickableRow { accentDialogOpen = true },
                 )
             }
             if (showDefaultsSection && state.installedLocales.isEmpty()) {
@@ -592,6 +607,18 @@ fun SettingsScreen(
                 channelPickerOpen = false
             },
             onDismiss = { channelPickerOpen = false },
+        )
+    }
+
+    if (accentDialogOpen) {
+        AccentDialog(
+            accents = accents,
+            current = defaultAccent,
+            onPick = { picked ->
+                viewModel.setDefaultAccent(picked)
+                accentDialogOpen = false
+            },
+            onDismiss = { accentDialogOpen = false },
         )
     }
 
@@ -844,6 +871,46 @@ private fun formatBytes(bytes: Long): String {
     } else {
         "%.1f MB".format(mb)
     }
+}
+
+@Composable
+private fun accentLabel(accent: String?): String = when (accent) {
+    null -> stringResource(R.string.settings_default_accent_own)
+    NO_ACCENT -> stringResource(R.string.settings_default_accent_none)
+    else -> accent.replaceFirstChar { it.uppercase() }
+}
+
+/** Accent rules for every voice: each voice's own (null), none, or one the bundles ship. */
+@Composable
+private fun AccentDialog(
+    accents: List<String>,
+    current: String?,
+    onPick: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options = listOf<String?>(null, NO_ACCENT) + accents
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_default_accent)) },
+        text = {
+            Column {
+                options.forEach { option ->
+                    ListItem(
+                        headlineContent = { Text(accentLabel(option)) },
+                        trailingContent = {
+                            RadioButton(selected = current == option, onClick = { onPick(option) })
+                        },
+                        modifier = Modifier.clickableRow { onPick(option) },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.settings_license_dialog_close))
+            }
+        },
+    )
 }
 
 @Composable

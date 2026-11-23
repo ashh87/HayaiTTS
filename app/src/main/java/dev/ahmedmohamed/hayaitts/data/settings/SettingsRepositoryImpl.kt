@@ -102,6 +102,12 @@ class SettingsRepositoryImpl(
         }
     }
 
+    override val defaultAccent: Flow<String?> = store.data.map { it[KEY_DEFAULT_ACCENT] }
+
+    override suspend fun setDefaultAccent(value: String?) {
+        store.edit { if (value == null) it.remove(KEY_DEFAULT_ACCENT) else it[KEY_DEFAULT_ACCENT] = value }
+    }
+
     override val allowedLanguages: Flow<Set<String>> = store.data.map { prefs ->
         val raw = prefs[KEY_ALLOWED_LANGUAGES] ?: return@map emptySet()
         raw.split(',').asSequence().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
@@ -127,5 +133,6 @@ class SettingsRepositoryImpl(
         val KEY_MAX_NUM_SENTENCES = intPreferencesKey("max_num_sentences")
         val KEY_DEFAULT_SPEAKERS = stringPreferencesKey("default_speakers_json")
         val KEY_ALLOWED_LANGUAGES = stringPreferencesKey("allowed_languages_csv")
+        val KEY_DEFAULT_ACCENT = stringPreferencesKey("default_accent")
     }
 }

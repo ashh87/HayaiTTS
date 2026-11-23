@@ -52,6 +52,16 @@ interface SettingsRepository {
      * picks at least one language, voices that don't speak any of those tags
      * are hidden across the app.
      */
+    /**
+     * Accent rules for every Kokoro voice, overriding each voice's own: an accent name
+     * (the bundle's `accent-<name>.json`), [NO_ACCENT], or null for each voice's own.
+     */
+    val defaultAccent: Flow<String?>
+    suspend fun setDefaultAccent(value: String?)
+
     val allowedLanguages: Flow<Set<String>>
     suspend fun setAllowedLanguages(value: Set<String>)
 }
+
+/** [SettingsRepository.defaultAccent] value: plain misaki, no accent rules. */
+const val NO_ACCENT = "-"

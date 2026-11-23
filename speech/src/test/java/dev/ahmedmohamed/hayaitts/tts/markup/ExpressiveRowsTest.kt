@@ -29,6 +29,24 @@ class ExpressiveRowsTest {
     }
 
     @Test
+    fun `several voices - each base sid gets only its own rows`() {
+        val dir = File.createTempFile("expr2", "").apply { delete(); mkdir(); deleteOnExit() }
+        // build_package.py --with: plain voices first (0, 1), then each voice's other rows
+        File(dir, ExpressiveRows.FILE).writeText(
+            "# base_sid sid emotion intensity% pitch\n" +
+                "0 0 neutral 100 +0\n0 2 neutral 100 +2\n0 3 happy 100 +0\n" +
+                "1 1 neutral 100 +0\n1 4 neutral 100 +2\n1 5 happy 100 +0\n",
+        )
+        val all = ExpressiveRows.read(dir)!!
+        assertEquals(3, all.forBase(0)!!.sidFor("happy", 1.0, 0.0))
+        assertEquals(5, all.forBase(1)!!.sidFor("happy", 1.0, 0.0))
+        assertEquals(4, all.forBase(1)!!.sidFor(null, 1.0, 2.0))
+        assertNull(all.forBase(2)) // an expressive row, not a voice
+        assertEquals(0, rows.forBase(0)!!.sidFor(null, 1.0, 0.0)) // single-voice files are all base 0
+        assertNull(rows.forBase(3))
+    }
+
+    @Test
     fun `no file, no rows`() {
         assertNull(ExpressiveRows.read(File.createTempFile("none", "").parentFile!!.resolve("missing-dir")))
     }

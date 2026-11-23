@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -109,6 +110,25 @@ class SettingsViewModel(
     val catalogLanguages: StateFlow<List<String>> = catalog.catalog
         .map { c -> c.flatMap { it.languages }.distinct().sorted() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyList())
+
+    val defaultAccent: StateFlow<String?> = settings.defaultAccent
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), null)
+
+    /** Accent names the installed bundles ship (`accent-<name>.json`), for the default-accent picker. */
+    val accents: StateFlow<List<String>> = voices.installed
+        .map { list ->
+            list.flatMap { v ->
+                File(v.installedPath).listFiles().orEmpty().mapNotNull {
+                    it.name.removePrefix("accent-").removeSuffix(".json").takeIf { n -> n != it.name && it.name.endsWith(".json") }
+                }
+            }.distinct().sorted()
+        }
+        .flowOn(dispatchers.io)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyList())
+
+    fun setDefaultAccent(value: String?) {
+        viewModelScope.launch { settings.setDefaultAccent(value) }
+    }
 
     val allowedLanguages: StateFlow<Set<String>> = settings.allowedLanguages
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptySet())
