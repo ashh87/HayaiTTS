@@ -47,27 +47,27 @@
  {
   "accent": "northern",
   "input": "I had a bath, then caught the last bus home.",
-  "phonemes": "ˌI had ɐ bˈaθ, ðˈɛn kˈɔːt ðə lˈast bˈʊs hˈoːm."
+  "phonemes": "ˌI ad ɐ bˈaθ, ðˈɛn kˈɔːt t lˈast bˈʊs hˈoːm."
  },
  {
   "accent": "northern",
   "input": "The cars are parked further down the road.",
-  "phonemes": "ðə kˈɑːz ɑː pˈɑːkt fˈɜːðə dˌWn ðə ɹˈoːd."
+  "phonemes": "t kˈɑːz ɑː pˈɑːkt fˈɜːðə dˌWn t ɹˈoːd."
  },
  {
   "accent": "northern",
   "input": "Wait for the late train, it's only eight.",
-  "phonemes": "wˈeːt fɔː ðə lˈeːt tɹˈeːn, ɪts ˈoːnlɪ ˈeːt."
+  "phonemes": "wˈeːt fɔː t lˈeːt tɹˈeːn, ɪts ˈoːnlɪ ˈeːt."
  },
  {
   "accent": "northern",
   "input": "Look at the book by the pool.",
-  "phonemes": "lˈuːk at ðə bˈuːk bI ðə pˈuːl."
+  "phonemes": "lˈuːk at t bˈuːk bI t pˈuːl."
  },
  {
   "accent": "northern",
   "input": "There's a wee loch near the church.",
-  "phonemes": "ðˌɛːz ɐ wˈiː lˈɒk nˌɪə ðə ʧˈɜːʧ."
+  "phonemes": "ðˌɛːz ɐ wˈiː lˈɒk nˌɪə t ʧˈɜːʧ."
  },
  {
   "accent": "northern",
@@ -77,16 +77,16 @@
  {
   "accent": "northern",
   "input": "We sailed on the loch. It's a dreich day, och aye.",
-  "phonemes": "wˌiː sˈeːld ˌɒn ðə lˈɒk. ˌɪts ɐ dɹˈIk dˈeː, ˈɒk ˈI."
+  "phonemes": "wˌiː sˈeːld ˌɒn t lˈɒk. ˌɪts ɐ dɹˈIk dˈeː, ˈɒk ˈI."
  },
  {
   "accent": "northern",
   "input": "The darling's cars, parked in the afternoon, were plastered with letters.",
-  "phonemes": "ðə dˈɑːlɪŋz kˈɑːz, pˈɑːkt ɪn ði ˌaftənˈuːn, wɜː plˈastəd wɪð lˈɛtəz."
+  "phonemes": "t dˈɑːlɪŋz kˈɑːz, pˈɑːkt ɪn t ˌaftənˈuːn, wɜː plˈastəd wɪð lˈɛtəz."
  },
  {
   "accent": "northern",
   "input": "Say [loch](/lˈɒk/) the English way.",
-  "phonemes": "sˈeː lˈɒk ði ˈɪŋɡlɪʃ wˈeː."
+  "phonemes": "sˈeː lˈɒk t ˈɪŋɡlɪʃ wˈeː."
  }
 ]
