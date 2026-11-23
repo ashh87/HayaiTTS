@@ -1,41 +1,37 @@
 {
-  "about": "Scottish (Edinburgh-ish), from the ROADMAP step 1 listening test: rhotic with a tapped r, one open vowel, LOT=THOUGHT, pure FACE, GOAT as Kokoro's oʊ (O; heard best, 2026-11-22), no FOOT/GOOSE contrast.",
+  "about": "Scottish (Edinburgh-ish): rhotic with a smooth r (ɹ; taps grew stray vowels, smooth won blind 2026-11-23), one open vowel, LOT=THOUGHT, pure FACE, GOAT as Kokoro's oʊ (O). NURSE kept standard (cleaner); FOOT/GOOSE as y (Kokoro's French u, nearest to ʉ) and MOUTH as broad u ('oot'), all by ear 2026-11-23.",
   "rules": [
     [
       "ʊəR",
-      "uɾ"
+      "uɹ"
     ],
     [
       "ɪəR",
-      "iɾ"
+      "iɹ"
     ],
     [
       "ɛːR",
-      "eɾ"
+      "eɹ"
     ],
     [
       "IəR",
-      "aeɾ"
+      "aeɹ"
     ],
     [
       "ɑːR",
-      "aɾ"
+      "aɹ"
     ],
     [
       "ɔːR",
-      "ɔɾ"
+      "ɔɹ"
     ],
     [
-      "ɜːR",
-      "ʌɾ"
+      "WəR",
+      "uɹ"
     ],
     [
       "R",
-      "ɾ"
-    ],
-    [
-      "ɹ",
-      "ɾ"
+      "ɹ"
     ],
     [
       "Bɑː",
@@ -63,27 +59,19 @@
     ],
     [
       "uː",
-      "u"
+      "y"
     ],
     [
       "ʊ",
-      "u"
-    ],
-    [
-      "WəR",
-      "ʌʊɾ"
+      "y"
     ],
     [
       "W",
-      "ʌʊ"
+      "u"
     ],
     [
       "ɛː",
       "e"
-    ],
-    [
-      "ɜː",
-      "ʌ"
     ],
     [
       "ˈI(?=#)",
@@ -93,11 +81,11 @@
   "words": {
     "loch": "lˈɔ",
     "och": "ˈɔ",
-    "dreich": "dɾˈi",
+    "dreich": "dɹˈi",
     "aye": "ˈae",
     "wee": "wˈi",
-    "outwith": "ˈʌʊtwɪθ",
-    "bairn": "bˈeɾn",
+    "outwith": "ˈutwɪθ",
+    "bairn": "bˈeɹn",
     "wean": "wˈen"
   }
 }
