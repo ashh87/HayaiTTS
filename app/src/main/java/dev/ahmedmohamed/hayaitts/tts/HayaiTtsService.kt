@@ -125,6 +125,9 @@ class HayaiTtsService : TextToSpeechService() {
             val t = tuningFor(voice.voiceId)
             runCatching { rt.sampleRateOf(voice.voiceId, languageHint, t.lengthScale, t.noiseScale, t.noiseScaleW) }
                 .onFailure { log.w(it) { "Preloading ${voice.voiceId} failed" } }
+            // starts espeak (misaki's fallback for unknown words) now, not mid-sentence
+            runCatching { Espeak.phonemize(applicationContext, "hello", "en") }
+                .onFailure { log.w(it) { "Preloading espeak failed" } }
         }
     }
 

@@ -73,7 +73,7 @@ class MisakiEnglishTest {
     fun `custom words override the dictionary in any case`() {
         val tsv = File.createTempFile("pronunciations", ".tsv").apply {
             deleteOnExit()
-            writeText("# comment\nniamh\tnˈiːv\nnormalé  nˌɔːmˈɑɑlˈɛː\nPOI\tpˌiːˌQˈI\nGPS\tʤˌiːpiːˈɛs\n")
+            writeText("# comment\nniamh\tnˈiːv\nStraße\tʃtɹˈɑːsə\nnormalé  nˌɔːmˈɑɑlˈɛː\nPOI\tpˌiːˌQˈI\nGPS\tʤˌiːpiːˈɛs\n")
         }
         val g = MisakiEnglish(
             true,
@@ -83,6 +83,7 @@ class MisakiEnglishTest {
             tagger,
         ) { null }
         assertEquals("həlˈQ nˈiːv.", g.phonemize("Hello Niamh."))
+        assertEquals("nˈiːv ʃtɹˈɑːsə.", g.phonemize("Niamh Straẞe.")) // capital ẞ, as on street signs
         assertEquals("nˌɔːmˈɑɑlˈɛː, nˌɔːmˈɑɑlˈɛː.", g.phonemize("Normalé, normalé."))
         // acronyms in capitals only (expected strings from the kokoro tools' lexicon.add_custom_words)
         assertEquals("pˌiːˌQˈI əhˈɛd.", g.phonemize("POI ahead."))

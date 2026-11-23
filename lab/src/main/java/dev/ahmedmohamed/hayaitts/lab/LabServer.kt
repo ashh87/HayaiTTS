@@ -28,6 +28,8 @@ class LabServer(base: String, private val cache: File) {
         val installed: String? = null,
         val accents: List<String>,
         val presets: Map<String, List<Double>>,
+        /** The bundle voices' own presets (prosody/), which the Mixer's preset sliders edit. */
+        @SerialName("voice_presets") val voicePresets: Map<String, Map<String, List<Double>>> = emptyMap(),
         @SerialName("n_controls") val nControls: Int,
         @SerialName("max_intensity") val maxIntensity: Double,
         val clips: List<ClipFolder>,
@@ -37,7 +39,16 @@ class LabServer(base: String, private val cache: File) {
         @SerialName("main_app") val mainApp: Stamp? = null,
         /** Voice bundles (build_package.py) the lab can hand to HayaiTTS. */
         val bundles: List<Bundle> = emptyList(),
+        /** The voices of the bundle the PC builds (pack.json): [PackVoice.voice] is a [voices] name when it is one. */
+        val pack: List<PackVoice> = emptyList(),
     )
+
+    @Serializable data class PackVoice(val name: String, val voice: String, val accent: String? = null)
+
+    /** GET /build.json: the last pack build. */
+    @Serializable data class Build(val running: Boolean, val ok: Boolean? = null, val log: List<String> = emptyList())
+
+    fun build(): Build = get(url("build.json")).use { JSON.decodeFromString(it.body!!.string()) }
 
     @Serializable data class Bundle(val name: String, val size: Long, val mtime: Long)
 

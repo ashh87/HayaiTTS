@@ -1,5 +1,5 @@
 {
-  "about": "Northern English (Yorkshire/Lancashire-ish), from the ROADMAP step 1 listening test. Non-rhotic, so R marks are ignored. t' for 'the' and unstressed -in (heard best, 2026-11-23); h dropped only in words without primary stress (he, his, her, had; 2026-11-23), dropping it everywhere was overdone. FACE stays A before a sentence end: eː there grew a tail ('normalé.' heard as 'normahlet').",
+  "about": "Northern English (Yorkshire/Lancashire-ish), from the ROADMAP step 1 listening test. Non-rhotic, so R marks are ignored. t' for 'the' and unstressed -in (heard best, 2026-11-23); h dropped only in words without primary stress (he, his, her, had; 2026-11-23), dropping it everywhere was overdone. FACE stays A before a sentence end: eː there grew a tail ('normalé.' heard as 'normahlet'). 'normalé' with a short a: bf_elsie's ɑːl turned to z when the word stood alone (2026-11-23).",
   "rules": [
     [
       "ʊk",
@@ -39,6 +39,7 @@
     ]
   ],
   "words": {
-    "the": "t"
+    "the": "t",
+    "normalé": "nˌɔːmˈalA"
   }
 }

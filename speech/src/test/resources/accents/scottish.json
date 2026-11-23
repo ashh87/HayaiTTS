@@ -1,5 +1,5 @@
 {
-  "about": "Scottish (Edinburgh-ish): rhotic with a smooth r (ɹ; taps grew stray vowels, smooth won blind 2026-11-23), one open vowel, LOT=THOUGHT, pure FACE, GOAT as Kokoro's oʊ (O). NURSE kept standard (cleaner); FOOT/GOOSE as y (Kokoro's French u, nearest to ʉ) and MOUTH as broad u ('oot'), all by ear 2026-11-23.",
+  "about": "Scottish (Edinburgh-ish): rhotic with a smooth r (ɹ; taps grew stray vowels, smooth won blind 2026-11-23), one open vowel, LOT=THOUGHT, pure FACE, GOAT as Kokoro's oʊ (O). NURSE kept standard (cleaner); FOOT/GOOSE as y (Kokoro's French u, nearest to ʉ) and MOUTH as broad u ('oot'), all by ear 2026-11-23. 'normalé' kept as before when the standard spelling gained a secondary stress on é for bf_harriet (2026-11-23).",
   "rules": [
     [
       "ʊəR",
@@ -86,6 +86,7 @@
     "wee": "wˈi",
     "outwith": "ˈutwɪθ",
     "bairn": "bˈeɹn",
-    "wean": "wˈen"
+    "wean": "wˈen",
+    "normalé": "nˌɔmˈale"
   }
 }

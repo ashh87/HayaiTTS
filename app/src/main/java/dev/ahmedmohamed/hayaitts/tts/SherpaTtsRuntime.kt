@@ -46,6 +46,7 @@ class SherpaTtsRuntime private constructor(
 
     private data class EngineKey(
         val voiceId: String,
+        val path: String, // a re-imported bundle keeps its id but gets a new dir
         val kokoroLanguage: String,
         val lengthBucket: Int,
         val noiseBucket: Int,
@@ -436,7 +437,9 @@ class SherpaTtsRuntime private constructor(
         val noiseB = noiseBucket(noiseScale)
         val noiseWB = noiseBucket(noiseScaleW)
 
-        val key = EngineKey(voiceId, kokoroLanguage, lengthB, noiseB, noiseWB, useNnapi, numThreads, maxNumSentences)
+        loaded.keys.filter { it.voiceId == voiceId && it.path != voice.installedPath }
+            .forEach { loaded.remove(it)?.tts?.runCatching { release() } }
+        val key = EngineKey(voiceId, voice.installedPath, kokoroLanguage, lengthB, noiseB, noiseWB, useNnapi, numThreads, maxNumSentences)
         loaded[key]?.let { return@synchronized it }
         val engine = buildEngine(
             voice = voice,
@@ -567,7 +570,9 @@ class SherpaTtsRuntime private constructor(
                     val espeakVoice = if (british) "en" else "en-us"
                     MisakiFrontend(
                         MisakiAssets.english(context, british, File(dir, CUSTOM_WORDS_FILE), accentFile) {
-                            Espeak.phonemize(context, it, espeakVoice).joinToString(" ")
+                            // an espeak failure loses this word only, not the whole sentence
+                            runCatching { Espeak.phonemize(context, it, espeakVoice).joinToString(" ") }
+                                .onFailure { e -> log.e(e) { "espeak failed for '$it'" } }.getOrNull()
                         },
                     )
                 }

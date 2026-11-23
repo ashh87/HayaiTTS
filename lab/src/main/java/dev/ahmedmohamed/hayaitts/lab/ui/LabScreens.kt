@@ -135,6 +135,14 @@ private fun ServerScreen(vm: LabViewModel) = Column(Modifier.verticalScroll(reme
             )
             if (ready) Button(onClick = vm::updateMain) { Text("Install HayaiTTS") }
         }
+        if (!idx?.pack.isNullOrEmpty()) {
+            Text("Pack (built on the PC)", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.titleSmall)
+            idx!!.pack.forEach { p ->
+                Text("${p.name}${p.accent?.let { " ($it)" }.orEmpty()}: ${p.voice}", style = MaterialTheme.typography.bodySmall)
+            }
+            Button(onClick = vm::buildPack, Modifier.padding(top = 4.dp)) { Text("Build pack") }
+            vm.buildLog.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
         if (!idx?.bundles.isNullOrEmpty()) Text("Voice bundles for HayaiTTS", Modifier.padding(top = 12.dp))
         idx?.bundles?.forEach { b ->
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -166,6 +174,7 @@ private fun MixerScreen(vm: LabViewModel) {
                 if (vm.emotion != "neutral") {
                     Text("Intensity ${(vm.intensity * 100).roundToInt()}%")
                     Slider(vm.intensity, { vm.intensity = (it * 20).roundToInt() / 20f }, valueRange = 0f..idx.maxIntensity.toFloat())
+                    PresetSliders(vm, idx)
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PlayStop(vm, vm::playMixer)
@@ -173,6 +182,12 @@ private fun MixerScreen(vm: LabViewModel) {
                     OutlinedButton(onClick = vm::measureCreak) { Text("Creak") }
                 }
                 if (vm.creakResult.isNotEmpty()) Text(vm.creakResult, style = MaterialTheme.typography.bodySmall)
+                if (idx.pack.isNotEmpty()) {
+                    Text("Use this mix in the pack as", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        idx.pack.forEach { p -> OutlinedButton(onClick = { vm.useInPack(p.name) }) { Text(p.name) } }
+                    }
+                }
                 TextButton(onClick = { vm.weights.keys.toList().forEach { vm.weights[it] = 0f } }) { Text("All sliders to 0") }
             }
         }
@@ -195,11 +210,44 @@ private fun MixerScreen(vm: LabViewModel) {
     }
 }
 
+/** expressive.PRESETS columns, with prosody_tuner.py's ranges. */
+private val PRESET_SLIDERS = listOf(
+    Triple("pitch (st)", -4f..4f, 0.1f), Triple("range (log2)", -1f..1f, 0.02f), Triple("tilt (st)", -4f..4f, 0.1f),
+    Triple("energy", -1.5f..1.5f, 0.05f), Triple("pause (ln)", -1f..1f, 0.02f), Triple("pace (ln 1/speed)", -0.5f..0.5f, 0.01f),
+    Triple("gain (dB)", -6f..6f, 0.1f),
+)
+
+@Composable
+private fun PresetSliders(vm: LabViewModel, idx: dev.ahmedmohamed.hayaitts.lab.LabServer.Index) {
+    val values = vm.presets[vm.emotion] ?: return
+    Text("${vm.emotion} preset of", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleSmall)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        idx.voicePresets.keys.forEach { v -> FilterChip(vm.presetVoice == v, { vm.pickPresets(v) }, label = { Text(v) }) }
+    }
+    PRESET_SLIDERS.forEachIndexed { i, (label, range, step) ->
+        val v = values.getOrNull(i) ?: return@forEachIndexed
+        Text("$label  ${"%.2f".format(v)}", style = MaterialTheme.typography.bodySmall)
+        Slider(v.toFloat().coerceIn(range), { vm.setPreset(i, ((it / step).roundToInt() * step).toDouble()) }, valueRange = range)
+    }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { vm.pickPresets(vm.presetVoice) }) { Text("Reset") }
+        if (vm.presetVoice != null) OutlinedButton(onClick = vm::savePreset) { Text("Save preset on PC") }
+    }
+}
+
 @Composable
 private fun PhrasesScreen(vm: LabViewModel) {
     val idx = vm.index ?: return Section("Phrases") { Text("Connect to the lab server first.") }
     Column(Modifier.fillMaxSize()) {
-        Section("Voice: the mixer's sliders. Accent:") {
+        Section("Voice (a pack voice brings its accent):") {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(vm.phraseVoice == null, { vm.phraseVoice = null }, label = { Text("Mixer's sliders") })
+                idx.pack.forEach { p ->
+                    FilterChip(vm.phraseVoice == p.name, { vm.phraseVoice = p.name; vm.accent = p.accent; vm.rulesOn = true },
+                        label = { Text(p.name) })
+                }
+            }
+            Text("Accent:")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.Center) {
                 FilterChip(vm.accent == null, { vm.accent = null }, label = { Text("none") })
                 idx.accents.forEach { a -> FilterChip(vm.accent == a, { vm.accent = a }, label = { Text(a) }) }

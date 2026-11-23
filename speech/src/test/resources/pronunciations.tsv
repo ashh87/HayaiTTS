@@ -1,0 +1,16 @@
+# word, then a tab or spaces, then phonemes  (misaki British set; see the cheat sheet in README or `lexicon.py` docstring)
+# Stress: ˈ before the stressed syllable's vowel, ˌ for secondary. Long vowels take ː.
+Niamh	nˈiːv
+Jiménez	hɪmˈɛnɛz
+Fukushima	fˌuːkuːʃˈiːmə
+normalé	nˌɔːmˈɑːlˌA
+Los	lˈɒs
+Angeles	ˈanʤəlˌiːz
+Bicester	bˈɪstə
+Milngavie	mɪlɡˈI
+Marylebone	mˈɑːləbən
+POI	pˌiːˌQˈI
+waypoint	wˈApˌYnt
+GPS	ʤˌiːpiːˈɛs
+Straße	ʃtɹˈɑːsə
+Strasse	ʃtɹˈɑːsə

@@ -17,6 +17,7 @@ import kotlin.math.pow
 class Speech(
     private val context: Context,
     private val kokoro: Kokoro,
+    /** Read at each render, so the Mixer's preset sliders apply live. */
     private val presets: Map<String, List<Double>>,
     private val nControls: Int,
     private val maxIntensity: Double,

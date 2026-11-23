@@ -8,6 +8,7 @@ import dev.ahmedmohamed.hayaitts.domain.model.Speaker
 import dev.ahmedmohamed.hayaitts.domain.model.VoiceCard
 import dev.ahmedmohamed.hayaitts.domain.repo.VoiceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
 import java.io.BufferedInputStream
@@ -61,8 +62,15 @@ class CustomBundleInstaller(
         progress: MutableStateFlow<Progress>,
     ): Result<Installed> = runCatching {
         val uuid = UUID.randomUUID().toString().take(12)
-        val voiceId = "custom-$uuid"
-        val voiceDir = File(context.filesDir, "voices/$voiceId")
+        // A bundle with an installed import's name (version aside) replaces it: same id, so its
+        // settings stay; new files go in a fresh dir and the old one goes only after success.
+        val previous = request.voiceName.takeIf { it.isNotBlank() }?.let { name ->
+            voiceRepository.installed.first().firstOrNull {
+                it.voiceId.startsWith("custom-") && it.title.substringBefore(VERSION_SEP) == name
+            }
+        }
+        val voiceId = previous?.voiceId ?: "custom-$uuid"
+        val voiceDir = File(context.filesDir, "voices/custom-$uuid")
         if (voiceDir.exists()) voiceDir.deleteRecursively()
         voiceDir.mkdirs()
 
@@ -103,7 +111,7 @@ class CustomBundleInstaller(
             val card = VoiceCard(
                 id = voiceId,
                 family = "custom",
-                title = request.voiceName.ifBlank { voiceId },
+                title = listOfNotNull(request.voiceName.ifBlank { voiceId }, versionOf(voiceDir)).joinToString(VERSION_SEP),
                 languages = request.languages,
                 speakers = request.speakers,
                 sampleRateHz = sampleRate,
@@ -113,8 +121,9 @@ class CustomBundleInstaller(
                 bundleUrl = request.sourceUri.toString(),
             )
             voiceRepository.markInstalledCustom(card, voiceDir.absolutePath, request.effectiveFamily)
+            previous?.installedPath?.takeIf { it != voiceDir.absolutePath }?.let { File(it).deleteRecursively() }
             progress.value = Progress(Step.Validating, 1f)
-            log.i { "Imported $voiceId at $voiceDir (effective=${request.effectiveFamily})" }
+            log.i { "${if (previous != null) "Replaced" else "Imported"} $voiceId at $voiceDir (effective=${request.effectiveFamily})" }
             Installed(voiceId, voiceDir, card)
         } finally {
             // Always wipe the cache copy — even on success — so we do not
@@ -124,6 +133,10 @@ class CustomBundleInstaller(
     }.onFailure {
         log.w(it) { "Custom import failed for ${request.sourceUri}" }
     }
+
+    /** `version.txt` from the bundle (build_package.py writes the build time), shown after the name. */
+    private fun versionOf(dir: File): String? = File(dir, "version.txt").takeIf { it.isFile && it.length() < 100 }
+        ?.readText()?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun copyUriToFile(uri: Uri, dest: File, progress: MutableStateFlow<Progress>) {
         dest.parentFile?.mkdirs()
@@ -325,3 +338,5 @@ class CustomBundleInstaller(
 // Helper extension so `archive.inputStream()` reads the file with no manual
 // FileInputStream boilerplate above.
 private fun File.inputStream(): InputStream = java.io.FileInputStream(this)
+
+private const val VERSION_SEP = " · "

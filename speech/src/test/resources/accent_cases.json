@@ -1,6 +1,11 @@
 [
  {
   "accent": "scottish",
+  "input": "It's normalé.",
+  "phonemes": "ˌɪts nˌɔmˈale."
+ },
+ {
+  "accent": "scottish",
   "input": "I had a bath, then caught the last bus home.",
   "phonemes": "ˌI had ɐ bˈaθ, ðˈɛn kˈɔt ðə lˈast bˈʌs hˈOm."
  },
@@ -43,6 +48,11 @@
   "accent": "scottish",
   "input": "Say [loch](/lˈɒk/) the English way.",
   "phonemes": "sˈe lˈɒk ði ˈɪŋɡlɪʃ wˈe."
+ },
+ {
+  "accent": "northern",
+  "input": "It's normalé.",
+  "phonemes": "ˌɪts nˌɔːmˈalA."
  },
  {
   "accent": "northern",

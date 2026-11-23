@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.io.File
 
-/** Golden cases from the kokoro tools' test_accent.py (accent_cases.json and the accents folder; kept identical, regenerate there). */
+/** Golden cases from the kokoro tools' test_accent.py (accent_cases.json, the accents folder and pronunciations.tsv; kept identical, regenerate there). */
 class AccentRulesTest {
     private fun text(name: String) = javaClass.classLoader!!.getResource(name)!!.readText()
 
@@ -17,7 +17,7 @@ class AccentRulesTest {
 
     private fun g2p(accent: String) = MisakiEnglish(
         true,
-        MisakiEnglish.Dict(PackedTable.file(File(MisakiEnglishTest.ASSETS, "gb_gold.kv"))),
+        MisakiEnglish.Dict(PackedTable.file(File(MisakiEnglishTest.ASSETS, "gb_gold.kv")), MisakiAssets.loadCustomWords(File(javaClass.classLoader!!.getResource("pronunciations.tsv")!!.toURI()))),
         MisakiEnglish.Dict(PackedTable.file(File(MisakiEnglishTest.ASSETS, "gb_silver.kv"))),
         MisakiEnglishTest.tokenizer,
         MisakiEnglishTest.tagger,

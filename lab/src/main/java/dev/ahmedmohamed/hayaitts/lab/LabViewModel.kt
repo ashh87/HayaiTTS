@@ -63,6 +63,10 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
     var mixerText by mutableStateOf("Lovely weather for a cup of tea. Shall we take the scenic route through the park?")
     var creakResult by mutableStateOf("")
         private set
+    /** The emotion presets every render uses: [presetVoice]'s from the server, as edited by the sliders. */
+    val presets = mutableStateMapOf<String, List<Double>>()
+    var presetVoice by mutableStateOf<String?>(null)
+        private set
 
     // Phrases
     class Phrase(val tag: String, val text: String)
@@ -70,6 +74,8 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
     var phrases by mutableStateOf<List<Phrase>>(emptyList())
         private set
     var accent by mutableStateOf<String?>(null)
+    /** A pack voice for the Phrases screen (its accent comes with it); null plays the Mixer's sliders. */
+    var phraseVoice by mutableStateOf<String?>(null)
     var rulesOn by mutableStateOf(true)
     val phonemes = mutableStateMapOf<Int, String>()
     val phraseCreak = mutableStateMapOf<Int, Int>()
@@ -214,10 +220,11 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
             kokoro?.close()
             val k = Kokoro(model, tokens)
             kokoro = k
-            speech = Speech(getApplication(), k, idx.presets, idx.nControls, idx.maxIntensity, words)
+            speech = Speech(getApplication(), k, presets, idx.nControls, idx.maxIntensity, words)
         }
         server = s
         index = idx
+        pickPresets(presetVoice?.takeIf { it in idx.voicePresets } ?: idx.voicePresets.keys.firstOrNull())
         voices.clear()
         phrases = phraseText.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }.map { line ->
             val m = PHRASE.matchEntire(line)
@@ -292,8 +299,8 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun accentFile(): File? = accent?.takeIf { rulesOn }?.let { File(cache, "accent_$it.json") }
 
-    private suspend fun render(text: String, accentFile: File?): Clip {
-        val v = mix()
+    private suspend fun render(text: String, accentFile: File?, voiceName: String? = null): Clip {
+        val v = voiceName?.let { voice(it) } ?: mix()
         val sp = speech ?: error("Not connected")
         return Clip(withContext(synthThread) { sp.render(text, v, accentFile) }, Kokoro.SAMPLE_RATE)
     }
@@ -315,13 +322,69 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
         status = "Playing ${mixLabel()}"
     }
 
-    fun saveMix() = launch("Saving the mix on the PC") {
+    fun saveMix() = launch("Saving the mix on the PC") { status = "Saved ${postMix()}" }
+
+    /** Saves the mixer's sliders on the PC; returns the saved voice's name. */
+    private suspend fun postMix(): String {
         val s = server ?: error("Not connected")
         val body = buildJsonObject { putJsonObject("weights") { weights.filterValues { it > 0f }.forEach { (k, v) -> put(k, v) } } }
         val reply = withContext(netThreads) { s.post("mix", body) }
-        val saved = LabServer.JSON.parseToJsonElement(reply).jsonObject["saved"]?.jsonPrimitive?.content
         index = withContext(netThreads) { s.index() }
-        status = "Saved $saved"
+        return LabServer.JSON.parseToJsonElement(reply).jsonObject["name"]?.jsonPrimitive?.content ?: error("no name in $reply")
+    }
+
+    /** The mixer's sliders become bundle voice [voice] (pack.json on the PC); Build pack makes the bundle. */
+    fun useInPack(voice: String) = launch("Saving the mix as $voice") {
+        val s = server ?: error("Not connected")
+        val name = postMix()
+        withContext(netThreads) { s.post("pack", buildJsonObject { put("voice", voice); put("source", name) }) }
+        index = withContext(netThreads) { s.index() }
+        status = "$voice is now $name. Build pack (Server tab) to make the bundle"
+    }
+
+    var buildLog by mutableStateOf<List<String>>(emptyList())
+        private set
+
+    /** Builds the bundle on the PC (pack.json + prosody/), following its progress until it's done. */
+    fun buildPack() = launch("Starting the build on the PC", alone = false) {
+        val s = server ?: error("Not connected")
+        withContext(netThreads) { s.post("build", buildJsonObject {}) }
+        while (true) {
+            val b = withContext(netThreads) { s.build() }
+            buildLog = b.log
+            status = b.log.lastOrNull() ?: "Building…"
+            if (!b.running) {
+                index = withContext(netThreads) { s.index() }
+                if (b.ok == true) status = "Pack built: Send it to HayaiTTS below"
+                return@launch
+            }
+            delay(3_000)
+        }
+    }
+
+    /** Load [voice]'s presets from the server's copy (null: the shared defaults). */
+    fun pickPresets(voice: String?) {
+        val idx = index ?: return
+        presetVoice = voice
+        presets.clear()
+        presets.putAll(idx.voicePresets[voice] ?: idx.presets)
+    }
+
+    fun setPreset(i: Int, v: Double) {
+        presets[emotion] = presets[emotion]!!.toMutableList().also { it[i] = v }
+    }
+
+    fun savePreset() = launch("Saving $emotion for $presetVoice on the PC") {
+        val s = server ?: error("Not connected")
+        val voice = presetVoice ?: error("The server has no bundle voices")
+        val values = presets[emotion] ?: error("No $emotion preset")
+        val body = buildJsonObject {
+            put("voice", voice); put("emotion", emotion)
+            put("values", kotlinx.serialization.json.JsonArray(values.map { JsonPrimitive(it) }))
+        }
+        withContext(netThreads) { s.post("prosody", body) }
+        index = withContext(netThreads) { s.index() } // so Reset goes back to what was just saved
+        status = "Saved $emotion for $voice in prosody/ (rebuild the bundle to hear it in HayaiTTS)"
     }
 
     fun measureCreak() = launch("Measuring creak (${Creak.LINES.size * 2} short lines)") {
@@ -340,12 +403,12 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun phrase(i: Int): Clip {
         val p = phrases[i]
-        val clip = render(p.text, accentFile())
+        val clip = render(p.text, accentFile(), phraseVoice)
         phraseCreak[i] = Creak.pulses(clip.samples)
         playingPhrase = i
         player.play(clip)
         val a = accent?.takeIf { rulesOn } ?: "no accent"
-        remember("Phrase · ${mixLabel()} · $a · ${p.text.take(40)}", clip)
+        remember("Phrase · ${phraseVoice ?: mixLabel()} · $a · ${p.text.take(40)}", clip)
         status = "Playing: ${p.text}"
         return clip
     }

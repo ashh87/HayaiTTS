@@ -55,6 +55,7 @@ class MisakiEnglish(
 
     /** Phonemes for [text], joined the way KPipeline.en_tokenize joins them. */
     fun phonemize(text: String): String {
+        val text = text.replace('ẞ', 'ß') // capital sharp s (street signs): NFKC keeps it and the tokenizer splits on it
         val pre = withoutMarkers(preprocess(if (ukNumbers) britishNumbers(text) else text))
         val toks = tokenizer.tokenize(pre.text)
         return if (toks.isEmpty()) "" else phonemize(toks, tagger.tag(toks.map { it.text }), pre)
