@@ -55,7 +55,8 @@ class MisakiEnglish(
 
     /** Phonemes for [text], joined the way KPipeline.en_tokenize joins them. */
     fun phonemize(text: String): String {
-        val text = text.replace('ẞ', 'ß') // capital sharp s (street signs): NFKC keeps it and the tokenizer splits on it
+        // capital sharp s (street signs): NFKC keeps it and the tokenizer splits on it; -straße split off (Hauptstraße)
+        val text = STRASSE.replace(text.replace('ẞ', 'ß'), "$1 $2")
         val pre = withoutMarkers(preprocess(if (ukNumbers) britishNumbers(text) else text))
         val toks = tokenizer.tokenize(pre.text)
         return if (toks.isEmpty()) "" else phonemize(toks, tagger.tag(toks.map { it.text }), pre)
@@ -790,6 +791,8 @@ class MisakiEnglish(
         private val DIPHTHONGS = "AIOQWYʤʧ".toSet()
         private val PUNCTS = ";:,.!?—…\"“”".toSet()
         private val NON_QUOTE_PUNCTS = PUNCTS - "\"“”".toSet()
+        /** expressive.py's STRASSE: a German street name's -straße/-strasse ending as its own word. */
+        private val STRASSE = Regex("(\\p{L}{2,})-?(stra(?:ß|ss)e)\\b", RegexOption.IGNORE_CASE)
         private val SUBTOKEN_JUNKS = "',-._‘’/".toSet()
         private val PUNCT_TAGS = setOf(".", ",", "-LRB-", "-RRB-", "``", "\"\"", "''", ":", "$", "#", "NFP")
         private val PUNCT_TAG_PHONEMES = mapOf("-LRB-" to "(", "-RRB-" to ")", "``" to "“", "\"\"" to "”", "''" to "”")

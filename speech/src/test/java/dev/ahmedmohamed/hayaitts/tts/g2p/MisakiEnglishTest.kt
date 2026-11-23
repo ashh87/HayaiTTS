@@ -84,6 +84,16 @@ class MisakiEnglishTest {
         ) { null }
         assertEquals("həlˈQ nˈiːv.", g.phonemize("Hello Niamh."))
         assertEquals("nˈiːv ʃtɹˈɑːsə.", g.phonemize("Niamh Straẞe.")) // capital ẞ, as on street signs
+        // OsmAnd's street names: -straße split off, so espeak only gets the rest
+        val withEspeak = MisakiEnglish(
+            true,
+            MisakiEnglish.Dict(PackedTable.file(File(ASSETS, "gb_gold.kv")), MisakiAssets.loadCustomWords(tsv)),
+            MisakiEnglish.Dict(null),
+            tokenizer,
+            tagger,
+        ) { mapOf("Dr" to "dˈɒktə", "-Quinn" to "kwˈɪn", "Haupt" to "hˈɔːpt")[it] } // espeak-ng -v en
+        assertEquals("ˈɒntuː dˈɒktə.kwˈɪn ʃtɹˈɑːsə.", withEspeak.phonemize("onto Dr.-Quinn-Straße."))
+        assertEquals("hˈɔːpt ʃtɹˈɑːsə.", withEspeak.phonemize("Hauptstraße."))
         assertEquals("nˌɔːmˈɑɑlˈɛː, nˌɔːmˈɑɑlˈɛː.", g.phonemize("Normalé, normalé."))
         // acronyms in capitals only (expected strings from the kokoro tools' lexicon.add_custom_words)
         assertEquals("pˌiːˌQˈI əhˈɛd.", g.phonemize("POI ahead."))
