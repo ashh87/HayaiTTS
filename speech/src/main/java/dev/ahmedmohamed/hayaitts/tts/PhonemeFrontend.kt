@@ -22,10 +22,11 @@ object Espeak {
     @Synchronized
     fun phonemize(context: Context, text: String, voice: String): List<String> {
         if (!initialized) {
-            // Copies the AAR's espeak-ng-data assets to filesDir on first run. On the phone the first
-            // call in a process failed and a later one worked (OsmAnd, 2026-11-23), so try a few times.
-            initialized = (1..3).any { piperPhonemizeInitialize(context) == 0 }
-            check(initialized) { "espeak-ng initialisation failed" }
+            // Copies the AAR's espeak-ng-data assets to filesDir on first run. The native side runs
+            // espeak_Initialize once and returns its sample rate (22050), -1 on failure, then 0 on
+            // every later call: so the first success is not 0 (read as failure until 2026-11-23).
+            check(piperPhonemizeInitialize(context) >= 0) { "espeak-ng initialisation failed" }
+            initialized = true
         }
         val result = piperPhonemizeText(text, voice) ?: error("espeak-ng could not phonemize for voice '$voice'")
         return try {
