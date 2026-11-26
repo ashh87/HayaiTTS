@@ -40,7 +40,7 @@ class MisakiEnglishTest {
         var same = 0
         val mismatches = mutableListOf<String>()
         for (british in listOf(true, false)) {
-            val g = g2p(british).apply { ukNumbers = false } // golden.tsv is stock misaki
+            val g = g2p(british).apply { ukNumbers = false; nameStress = false } // golden.tsv is stock misaki
             for (r in rows.filter { it.british == british }) {
                 val got = if (withSpacyTags) g.phonemize(r.toks, r.tags) else g.phonemize(r.text)
                 if (got == r.ps.trim()) same++ else mismatches += "${if (british) "gb" else "us"} | ${r.text}\n  want ${r.ps.trim()}\n  got  $got"
@@ -92,8 +92,24 @@ class MisakiEnglishTest {
             tokenizer,
             tagger,
         ) { mapOf("Dr" to "dˈɒktə", "-Quinn" to "kwˈɪn", "Haupt" to "hˈɔːpt")[it] } // espeak-ng -v en
-        assertEquals("ˈɒntuː dˈɒktə.kwˈɪn ʃtɹˈɑːsə.", withEspeak.phonemize("onto Dr.-Quinn-Straße."))
+        assertEquals("ˈɒntuː dˌɒktə.kwˌɪn ʃtɹˈɑːsə.", withEspeak.phonemize("onto Dr.-Quinn-Straße.")) // name stress: Straße heads the name
         assertEquals("hˈɔːpt ʃtɹˈɑːsə.", withEspeak.phonemize("Hauptstraße."))
+        // the shipped custom words: Jr after a name read out, JR/SR (route refs) still spelled
+        val shipped = MisakiEnglish(
+            true,
+            MisakiEnglish.Dict(PackedTable.file(File(ASSETS, "gb_gold.kv")),
+                MisakiAssets.loadCustomWords(File(javaClass.classLoader!!.getResource("pronunciations.tsv")!!.toURI()))),
+            MisakiEnglish.Dict(null),
+            tokenizer,
+            tagger,
+        ) { null }
+        assertEquals("kˈɪŋ ʤˌuːnɪə bˈʊləvɑːd", shipped.phonemize("Turn onto King Jr Boulevard").substringAfter("ˈɒntuː "))
+        assertEquals("kˈɪŋ sˈiːnɪə stɹˌiːt", shipped.phonemize("Turn onto King Sr Street").substringAfter("ˈɒntuː "))
+        assertEquals("ˌɛsˈɑː fˈIv hˈʌndɹədən twˈɛnti", shipped.phonemize("SR 520"))
+        // Dr / Sr by context (expressive.title_abbr): Drive after a name, Sister before one
+        assertEquals("ʧˈɜːʧ dɹˈIv.", shipped.phonemize("Church Dr."))
+        assertEquals("ˈɑːsk dˌɒktə smˈɪθ.", shipped.phonemize("Ask Dr. Smith.")) // doctor SMITH (name stress)
+        assertEquals("sˈɪstə mˈɛːɹi stɹˌiːt.", shipped.phonemize("Sr. Mary Street.")) // MARY Street
         assertEquals("nˌɔːmˈɑɑlˈɛː, nˌɔːmˈɑɑlˈɛː.", g.phonemize("Normalé, normalé."))
         // acronyms in capitals only (expected strings from the kokoro tools' lexicon.add_custom_words)
         assertEquals("pˌiːˌQˈI əhˈɛd.", g.phonemize("POI ahead."))

@@ -26,6 +26,7 @@ class MisakiEnglish(
 
     /** British number reading (britishNumbers, "hundred and"); off only to compare with stock misaki. */
     internal var ukNumbers = british
+    internal var nameStress = true // off only to compare with stock misaki (golden.tsv)
 
 
     /** Lookup over misaki's dictionary plus per-voice overrides (custom words win). */
@@ -56,7 +57,7 @@ class MisakiEnglish(
     /** Phonemes for [text], joined the way KPipeline.en_tokenize joins them. */
     fun phonemize(text: String): String {
         // capital sharp s (street signs): NFKC keeps it and the tokenizer splits on it; -straße split off (Hauptstraße)
-        val text = STRASSE.replace(text.replace('ẞ', 'ß'), "$1 $2")
+        val text = titleAbbr(STRASSE.replace(text.replace('ẞ', 'ß'), "$1 $2"))
         val pre = withoutMarkers(preprocess(if (ukNumbers) britishNumbers(text) else text))
         val toks = tokenizer.tokenize(pre.text)
         return if (toks.isEmpty()) "" else phonemize(toks, tagger.tag(toks.map { it.text }), pre)
@@ -136,6 +137,7 @@ class MisakiEnglish(
         val merged = words.map { if (it is MToken) it else mergeTokens(it as List<MToken>, unk = "") }
         val ps = merged.map { (it.phonemes ?: "").replace('ɾ', 'T').replace('ʔ', 't') }.toMutableList()
         vocatives(merged, ps)
+        if (nameStress) nameStress(merged, ps)
         accent?.apply(merged, ps)
         if (pre != null && pre.marks.isNotEmpty() && merged.isNotEmpty()) attachMarkers(merged, ps, pre.marks)
         // Kokoro v1.0 (version != '2.0') + KPipeline.en_tokenize: phonemes + one space per whitespace.
@@ -156,6 +158,32 @@ class MisakiEnglish(
                 ps[i - 1] = ",".repeat(n)
             }
         }
+    }
+
+    /**
+     * In a run of capitalised words (Dr Martin Luther King Jr Boulevard) only the head keeps primary stress
+     * (a sentence's first word is left out): the last word, or the one before Street (CHURCH Street); Jr / Sr end the name before them. With every
+     * word primary, Kokoro pauses after each ("Luther, King"). The kokoro tools' expressive.name_stress, kept identical.
+     */
+    private fun nameStress(tokens: List<MToken>, ps: MutableList<String>) {
+        val run = mutableListOf<Int>()
+        fun flush() {
+            val head = run.size - if (run.size > 1 && tokens[run.last()].text in STREET) 2 else 1
+            for ((k, i) in run.withIndex()) if (k != head) ps[i] = ps[i].replace('ˈ', 'ˌ')
+            run.clear()
+        }
+        var start = true // a sentence's first word is capitalised anyway: not part of a name
+        for ((i, t) in tokens.withIndex()) {
+            val first = start
+            start = t.text in SENTENCE_ENDS || (start && t.text.none { it.isLetter() })
+            if (!first && t.text.firstOrNull()?.isUpperCase() == true && t.text.any { it.isLetter() } && ps[i].isNotEmpty()) {
+                if (t.text.trimEnd('.') in NAME_SUFFIXES && run.isNotEmpty()) flush()
+                run += i
+                if (t.whitespace.isNotEmpty()) continue
+            }
+            flush()
+        }
+        flush()
     }
 
     /**
@@ -778,6 +806,9 @@ class MisakiEnglish(
         }
 
         // count of commas before each, by ear (3 for love, 2 for mate)
+        private val STREET = setOf("Street", "St")
+        private val NAME_SUFFIXES = setOf("Jr", "Sr", "Junior", "Senior")
+        private val SENTENCE_ENDS = setOf(".", "!", "?")
         private val VOCATIVES = mapOf(
             "love" to 3, "mate" to 2, "pet" to 2, "duck" to 2, "darling" to 2, "dear" to 2, "hun" to 2, "babe" to 2,
             "pal" to 2, "hen" to 2, "chuck" to 2, "sweetheart" to 2,
@@ -793,6 +824,24 @@ class MisakiEnglish(
         private val NON_QUOTE_PUNCTS = PUNCTS - "\"“”".toSet()
         /** expressive.py's STRASSE: a German street name's -straße/-strasse ending as its own word. */
         private val STRASSE = Regex("(\\p{L}{2,})-?(stra(?:ß|ss)e)\\b", RegexOption.IGNORE_CASE)
+
+        /** expressive.py's TITLE_ABBR / title_abbr: street-name Dr and Sr by context. */
+        private val TITLE_ABBR = Regex("(?<![\\w.-])(Dr|Sr)(\\.(?=\\s+\\w))?(?![\\w'-])")
+        private val PREV_WORD = Regex("(\\S+)\\s+$")
+        private val NEXT_WORD = Regex("^\\s+(\\S+)")
+
+        private fun capitalised(word: String?): Boolean = word?.firstOrNull { it.isLetter() }?.isUpperCase() == true
+
+        /** "Mulberry Dr" -> Drive (a name before, none after), else misaki's doctor; "Davis Sr" -> Senior, "Sr Mary" -> Sister. */
+        internal fun titleAbbr(text: String): String = TITLE_ABBR.replace(text) { m ->
+            val afterName = capitalised(PREV_WORD.find(text.substring(0, m.range.first))?.groupValues?.get(1))
+            val next = NEXT_WORD.find(text.substring(m.range.last + 1))?.groupValues?.get(1)
+            when {
+                m.groupValues[1] == "Sr" -> if (afterName) "Senior" else "Sister"
+                afterName && !capitalised(next) -> "Drive"
+                else -> m.value
+            }
+        }
         private val SUBTOKEN_JUNKS = "',-._‘’/".toSet()
         private val PUNCT_TAGS = setOf(".", ",", "-LRB-", "-RRB-", "``", "\"\"", "''", ":", "$", "#", "NFP")
         private val PUNCT_TAG_PHONEMES = mapOf("-LRB-" to "(", "-RRB-" to ")", "``" to "“", "\"\"" to "”", "''" to "”")

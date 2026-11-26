@@ -6,6 +6,16 @@
  },
  {
   "accent": "scottish",
+  "input": "Turn left onto Church Dr, then Sr Mary Street, then King Jr Sr Street.",
+  "phonemes": "tˈɜːɹn lˈɛft ˈɔnty ʧˌɜːɹʧ dɹˈIv, ðˈɛn sˌɪstəɹ mˈeɹi stɹˌiːt, ðˈɛn kˈɪŋ ʤˈynɪə sˈiːniɹ stɹˌiːt."
+ },
+ {
+  "accent": "scottish",
+  "input": "Continue to Dr Martin Luther King Jr Boulevard, then Church Street and Great Western Road.",
+  "phonemes": "kəntˈɪnjy tə dˌɔktə mˌaɹtɪn lˌyθə kˈɪŋ ʤˌynɪə bˈyləvaɹd, ðˈɛn ʧˈɜːɹʧ stɹˌiːt and ɡɹˌet wˌɛstᵊɹn ɹˈOd."
+ },
+ {
+  "accent": "scottish",
   "input": "I had a bath, then caught the last bus home.",
   "phonemes": "ˌI had ɐ bˈaθ, ðˈɛn kˈɔt ðə lˈast bˈʌs hˈOm."
  },
@@ -53,6 +63,16 @@
   "accent": "northern",
   "input": "It's normalé.",
   "phonemes": "ˌɪts nˌɔːmˈalA."
+ },
+ {
+  "accent": "northern",
+  "input": "Turn left onto Church Dr, then Sr Mary Street, then King Jr Sr Street.",
+  "phonemes": "tˈɜːn lˈɛft ˈɒntuː ʧˌɜːʧ dɹˈIv, ðˈɛn sˌɪstə mˈɛːɹɪ stɹˌiːt, ðˈɛn kˈɪŋ ʤˈuːnɪə sˈiːnɪə stɹˌiːt."
+ },
+ {
+  "accent": "northern",
+  "input": "Continue to Dr Martin Luther King Jr Boulevard, then Church Street and Great Western Road.",
+  "phonemes": "kəntˈɪnjuː tə dˌɒktə mˌɑːtɪn lˌuːθə kˈɪŋ ʤˌuːnɪə bˈʊləvɑːd, ðˈɛn ʧˈɜːʧ stɹˌiːt and ɡɹˌeːt wˌɛstᵊn ɹˈoːd."
  },
  {
   "accent": "northern",
