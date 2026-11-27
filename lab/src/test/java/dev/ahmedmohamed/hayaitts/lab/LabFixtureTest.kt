@@ -33,7 +33,7 @@ class LabFixtureTest {
 
     @Test
     fun `onnx runtime gives the torch durations`() {
-        val dir = File(System.getenv("KOKORO_BUNDLE") ?: "../../kokoro/build/bf_harriet-expressive")
+        val dir = File(System.getenv("KOKORO_BUNDLE") ?: "../../kokoro/build/british-expressive")
         assumeTrue("no model at $dir", File(dir, "model.onnx").isFile)
         Kokoro(File(dir, "model.onnx"), File(dir, "tokens.txt").readText()).use { k ->
             for (c in fixture.getValue("chunks").jsonArray.map { it.jsonObject }) {
